@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Preceptor Pro v23.5</title>
+    <title>Preceptor Pro v23.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -12,22 +12,20 @@
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
         .card { background: white; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .check-circle { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #e5e7eb; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .check-circle.active { background-color: #2563eb; border-color: #2563eb; color: white; }
         .tab-btn { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 8px 4px; border-radius: 12px; transition: all 0.2s; }
         .tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #2563eb; }
         .tab-btn.inactive { color: #9ca3af; }
-        .saca-bg { background-color: #fefce8 !important; border-left: 4px solid #facc15 !important; }
+        .saca-bg { background-color: #fffbeb !important; border-left: 4px solid #f59e0b !important; }
     </style>
 </head>
 <body class="pb-32">
     <div id="app" class="max-w-md mx-auto min-h-screen relative">
         
-        <!-- HEADER -->
+        <!-- HEADER ORIGINAL -->
         <header class="glass sticky top-0 z-50 px-6 py-4 border-b border-gray-200/30 flex justify-between items-center">
             <div>
-                <p id="header-date" class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-0.5"></p>
-                <h1 class="text-lg font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500">v23.5</span></h1>
+                <p id="header-date" class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-0.5">LUNES, 6 ABR</p>
+                <h1 class="text-lg font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500">V23.6</span></h1>
             </div>
             <div class="w-8 h-5 bg-blue-600 rounded flex flex-col overflow-hidden border border-blue-700 shadow-sm">
                 <div class="flex-1 bg-[#75AADB]"></div>
@@ -39,8 +37,8 @@
         <!-- CONTENEDOR PRINCIPAL -->
         <main id="main-view" class="px-4 py-4"></main>
 
-        <!-- NAVEGACIÓN INFERIOR -->
-        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] glass rounded-[2rem] p-2 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
+        <!-- NAVEGACIÓN INFERIOR (ESTILO CAPTURA) -->
+        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] glass rounded-[2.5rem] p-2 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
             <button onclick="changeTab('home')" class="flex-1 py-2 flex flex-col items-center gap-1" id="nav-home">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
                 <span class="text-[8px] font-bold uppercase tracking-tighter">Cursos</span>
@@ -60,31 +58,24 @@
         </nav>
     </div>
 
-    <!-- MODAL FICHA COMPLETA -->
+    <!-- MODAL FICHA / SACA -->
     <div id="modal-obs" class="fixed inset-0 z-[300] bg-black/60 hidden items-center justify-center p-6 backdrop-blur-md">
         <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl overflow-y-auto max-h-[90vh]">
             <div class="flex justify-between items-start mb-4">
                 <div>
-                    <h3 id="obs-student-name" class="text-lg font-black italic uppercase text-blue-600 leading-none">Nombre Alumno</h3>
-                    <p class="text-[9px] font-black text-gray-400 uppercase mt-1">Ficha Integral</p>
+                    <h3 id="obs-student-name" class="text-lg font-black italic uppercase text-blue-600 leading-none">Alumno</h3>
+                    <p class="text-[9px] font-black text-gray-400 uppercase mt-1">Configuración Individual</p>
                 </div>
                 <button onclick="closeObsModal()" class="text-gray-300 font-bold text-xl">×</button>
             </div>
             <div class="space-y-4">
                 <div>
                     <label class="text-[8px] font-black text-gray-400 uppercase mb-1 block">Fecha de Nacimiento</label>
-                    <input type="date" id="obs-birth-date" class="w-full bg-gray-50 border-none rounded-xl p-3 text-xs font-bold outline-blue-500 text-gray-700">
-                </div>
-                <div class="p-4 bg-yellow-50 rounded-2xl border border-yellow-100">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="text-[9px] font-black text-yellow-700 uppercase italic">Pasantía / SACA</label>
-                        <input type="checkbox" id="obs-saca-active" class="w-4 h-4 accent-yellow-600">
-                    </div>
-                    <input type="text" id="obs-saca-details" class="w-full bg-white border-none rounded-lg p-2.5 text-[10px] font-bold outline-yellow-500 text-gray-700 mb-2" placeholder="Días y Horarios">
+                    <input type="date" id="obs-birth-date" class="w-full bg-gray-50 border-none rounded-xl p-3 text-xs font-bold outline-blue-500">
                 </div>
                 <div>
                     <label class="text-[8px] font-black text-gray-400 uppercase mb-1 block">Observaciones</label>
-                    <textarea id="obs-text-area" class="w-full bg-gray-50 border-none rounded-2xl p-5 text-xs font-bold outline-blue-500 h-32 leading-relaxed text-gray-700" placeholder="Tratamientos..."></textarea>
+                    <textarea id="obs-text-area" class="w-full bg-gray-50 border-none rounded-2xl p-5 text-xs font-bold outline-blue-500 h-24" placeholder="Notas médicas, etc..."></textarea>
                 </div>
             </div>
             <div class="flex gap-2 mt-6">
@@ -95,29 +86,25 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'preceptor_pro_v23_data';
+        const STORAGE_KEY = 'preceptor_pro_v23_full_data';
         let state = {
             tab: 'home',
             course: null,
             subTab: 'asis',
-            asisView: 'dia',
             students: { "5° A BOEA": [], "5° B BOEA": [], "5° A BOI": [] },
             attendance: {},
             extraChecks: {},
             extraTitles: {},
             observations: {},
             birthdays: {},
-            saca: {},
             schedule: {},
             notes: [],
-            schedTab: 'mañana',
-            referentes: {} // { course: { delegados: "", profesores: "" } }
+            referentes: {}
         };
 
         const savedData = localStorage.getItem(STORAGE_KEY);
-        if (savedData) { try { state = { ...state, ...JSON.parse(savedData) }; } catch(e) {} }
+        if (savedData) { try { state = JSON.parse(savedData); } catch(e) {} }
 
-        let currentObsTarget = null;
         function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
         function changeTab(t) { state.tab = t; state.course = null; render(); }
@@ -126,8 +113,7 @@
             const container = document.getElementById('main-view');
             document.querySelectorAll('nav button').forEach(btn => {
                 const id = btn.id.split('-')[1];
-                const isActive = state.tab === id || (state.tab === 'course' && id === 'home');
-                btn.style.color = isActive ? '#2563eb' : '#d1d5db';
+                btn.style.color = (state.tab === id || (state.tab === 'course' && id === 'home')) ? '#2563eb' : '#9ca3af';
             });
             if (state.tab === 'home') renderHome(container);
             else if (state.tab === 'course') renderCourse(container);
@@ -138,155 +124,114 @@
         }
 
         function renderHome(c) {
-            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 italic px-2">Cursos Asignados</h2>` +
+            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 italic px-2">Mis Cursos</h2>` +
                 Object.keys(state.students).map(course => `
-                <div onclick="state.tab='course';state.course='${course}';render()" class="card p-6 mb-3 flex justify-between items-center cursor-pointer active:scale-95 transition-all">
-                    <div><span class="text-xl font-black italic text-gray-800 tracking-tighter uppercase leading-none">${course}</span><p class="text-[9px] font-bold text-blue-500 mt-1 uppercase">${state.students[course].length} Alumnos</p></div><span class="text-blue-100">→</span></div>`).join('');
+                <div onclick="state.tab='course';state.course='${course}';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer active:scale-[0.98] transition-all">
+                    <div>
+                        <span class="text-2xl font-black italic text-gray-800 tracking-tighter uppercase leading-none">${course}</span>
+                        <p class="text-[10px] font-bold text-blue-500 mt-2 uppercase tracking-tight">${state.students[course].length} ALUMNOS</p>
+                    </div>
+                    <span class="text-blue-100 text-xl font-black">→</span>
+                </div>`).join('');
         }
 
         function renderCourse(c) {
             c.innerHTML = `<div class="flex items-center gap-4 mb-4"><button onclick="changeTab('home')" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-xl font-black italic uppercase tracking-tighter">${state.course}</h2></div>
                 <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4 gap-1">
-                    <button onclick="state.subTab='asis';render()" class="flex-1 tab-btn ${state.subTab==='asis'?'active':'inactive'}">Lista</button>
+                    <button onclick="state.subTab='asis';render()" class="flex-1 tab-btn ${state.subTab==='asis'?'active':'inactive'}">Asis</button>
                     <button onclick="state.subTab='extra';render()" class="flex-1 tab-btn ${state.subTab==='extra'?'active':'inactive'}">Extra</button>
-                    <button onclick="state.subTab='fichas';render()" class="flex-1 tab-btn ${state.subTab==='fichas'?'active':'inactive'}">Ficha</button>
                     <button onclick="state.subTab='refs';render()" class="flex-1 tab-btn ${state.subTab==='refs'?'active':'inactive'}">Ref.</button>
+                    <button onclick="state.subTab='fichas';render()" class="flex-1 tab-btn ${state.subTab==='fichas'?'active':'inactive'}">Ficha</button>
                     <button onclick="state.subTab='alum';render()" class="flex-1 tab-btn ${state.subTab==='alum'?'active':'inactive'}">Alum.</button>
                 </div>
                 ${state.subTab === 'asis' ? renderAsisPanel() : 
                   state.subTab === 'extra' ? renderExtraPanel() : 
-                  state.subTab === 'fichas' ? renderFichasPanel() : 
-                  state.subTab === 'refs' ? renderReferentes() : renderAlumEditor()}`;
+                  state.subTab === 'refs' ? renderReferentes() : 
+                  state.subTab === 'fichas' ? renderFichasPanel() : renderAlumEditor()}`;
         }
 
-        // --- REFERENTES ---
-        function renderReferentes() {
-            const refs = state.referentes[state.course] || { delegados: "", profesores: "" };
-            return `
-                <div class="space-y-4 pb-24">
-                    <div class="card p-6 border-l-4 border-l-blue-600">
-                        <label class="text-[9px] font-black text-blue-600 uppercase italic mb-2 block">Delegados del Curso</label>
-                        <textarea onchange="saveRefs('${state.course}', 'delegados', this.value)" class="w-full bg-gray-50 border-none rounded-xl p-4 text-[11px] font-bold outline-none h-24 text-gray-700 leading-tight" placeholder="Nombre de los delegados...">${refs.delegados}</textarea>
-                    </div>
-                    <div class="card p-6 border-l-4 border-l-green-500">
-                        <label class="text-[9px] font-black text-green-600 uppercase italic mb-2 block">Profesores Referentes / Tutores</label>
-                        <textarea onchange="saveRefs('${state.course}', 'profesores', this.value)" class="w-full bg-gray-50 border-none rounded-xl p-4 text-[11px] font-bold outline-none h-24 text-gray-700 leading-tight" placeholder="Nombre de los profes referentes...">${refs.profesores}</textarea>
-                    </div>
-                    <p class="text-[8px] font-black text-gray-300 uppercase italic text-center px-6 leading-tight">Esta información es específica para ${state.course}.</p>
-                </div>
-            `;
-        }
-
-        function saveRefs(course, field, val) {
-            if (!state.referentes[course]) state.referentes[course] = { delegados: "", profesores: "" };
-            state.referentes[course][field] = val;
-            save();
-        }
-
-        // --- ASISTENCIA ---
         function renderAsisPanel() {
             const todayStr = new Date().toISOString().split('T')[0];
             const students = state.students[state.course] || [];
             return `<div class="space-y-2 pb-24">` + students.map(s => {
                 const status = state.attendance[`${state.course}_${s}_${todayStr}`] || '';
-                const saca = state.saca[`${state.course}_${s}`];
-                return `<div class="card p-4 flex justify-between items-center px-6 ${saca?.active ? 'saca-bg' : ''}">
-                    <div class="flex flex-col truncate pr-4">
-                        <span class="font-bold text-[10px] uppercase text-gray-700 italic truncate">${s}</span>
-                        ${saca?.active ? `<span class="text-[7px] font-black text-yellow-600 uppercase tracking-tighter mt-0.5 italic">● EN PASANTÍA (SACA)</span>` : ''}
+                const isPasantia = status === 'S';
+                return `<div class="card p-4 flex justify-between items-center px-6 ${isPasantia ? 'saca-bg' : ''}">
+                    <div class="flex flex-col truncate pr-2">
+                        <span class="font-black text-[11px] uppercase text-gray-800 italic truncate">${s}</span>
+                        ${isPasantia ? `<span class="text-[7px] font-black text-amber-600 uppercase italic">● TRABAJO / ACAP</span>` : ''}
                     </div>
-                    <div class="flex gap-1.5">
-                        <button onclick="setAsis('${s}','P')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300 border-gray-100'}">P</button>
-                        <button onclick="setAsis('${s}','A')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300 border-gray-100'}">A</button>
-                        <button onclick="setAsis('${s}','J')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='J'?'bg-orange-500 text-white border-orange-500':'bg-gray-50 text-gray-300 border-gray-100'}">J</button>
+                    <div class="flex gap-1">
+                        <button onclick="setAsis('${s}','P')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300'}">P</button>
+                        <button onclick="setAsis('${s}','A')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300'}">A</button>
+                        <button onclick="setAsis('${s}','M')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='M'?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-300'} flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        </button>
+                        <button onclick="setAsis('${s}','S')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='S'?'bg-amber-500 text-white border-amber-500':'bg-gray-50 text-gray-300'} flex items-center justify-center">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                        </button>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
         }
         function setAsis(s, type) { const today = new Date().toISOString().split('T')[0]; const key = `${state.course}_${s}_${today}`; state.attendance[key] = (state.attendance[key] === type) ? '' : type; render(); }
 
-        // --- FICHAS ---
-        function renderFichasPanel() {
-            const students = state.students[state.course] || [];
-            return `<div class="space-y-2 pb-24">${students.map(s => {
-                const hasObs = state.observations[`${state.course}_${s}`]?.length > 0;
-                const birth = state.birthdays[`${state.course}_${s}`];
-                const saca = state.saca[`${state.course}_${s}`];
-                return `<div onclick="openObsModal('${s}')" class="card p-5 flex justify-between items-center cursor-pointer active:bg-gray-50 transition-all border-l-4 ${saca?.active ? 'border-l-yellow-400' : (hasObs ? 'border-l-blue-500' : 'border-l-transparent')}">
-                    <div class="flex flex-col"><span class="text-[11px] font-black italic text-gray-800 uppercase tracking-tight">${s}</span><div class="flex gap-2 items-center mt-1 flex-wrap">
-                        ${saca?.active ? `<span class="text-[7px] font-black bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded uppercase">SACA</span>` : ''}
-                        ${birth ? `<span class="text-[7px] font-black bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded uppercase">🎂 ${birth.split('-').reverse().join('/')}</span>` : ''}
-                    </div></div><span class="text-blue-100 font-black text-xs">✎</span></div>`;
-            }).join('')}</div>`;
+        function renderReferentes() {
+            const refs = state.referentes[state.course] || { delegados: "", profesores: "" };
+            return `<div class="space-y-4 pb-24">
+                <div class="card p-6 border-l-4 border-l-blue-600">
+                    <label class="text-[9px] font-black text-blue-600 uppercase italic mb-2 block">Delegados</label>
+                    <textarea onchange="saveRefs('${state.course}', 'delegados', this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${refs.delegados}</textarea>
+                </div>
+                <div class="card p-6 border-l-4 border-l-green-500">
+                    <label class="text-[9px] font-black text-green-600 uppercase italic mb-2 block">Profesores / Tutores</label>
+                    <textarea onchange="saveRefs('${state.course}', 'profesores', this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${refs.profesores}</textarea>
+                </div></div>`;
         }
-        function openObsModal(student) { currentObsTarget = student; const sData = state.saca[`${state.course}_${student}`] || {active: false, info: ''}; document.getElementById('obs-student-name').innerText = student; document.getElementById('obs-text-area').value = state.observations[`${state.course}_${student}`] || ""; document.getElementById('obs-birth-date').value = state.birthdays[`${state.course}_${student}`] || ""; document.getElementById('obs-saca-active').checked = sData.active; document.getElementById('obs-saca-details').value = sData.info; document.getElementById('modal-obs').style.display = 'flex'; }
-        function closeObsModal() { document.getElementById('modal-obs').style.display = 'none'; }
-        function saveObs() { const val = document.getElementById('obs-text-area').value.trim(); const birth = document.getElementById('obs-birth-date').value; const sActive = document.getElementById('obs-saca-active').checked; const sInfo = document.getElementById('obs-saca-details').value; state.observations[`${state.course}_${currentObsTarget}`] = val; state.birthdays[`${state.course}_${currentObsTarget}`] = birth; state.saca[`${state.course}_${currentObsTarget}`] = { active: sActive, info: sInfo }; closeObsModal(); render(); }
+        function saveRefs(c, f, v) { if(!state.referentes[c]) state.referentes[c]={delegados:"",profesores:""}; state.referentes[c][f]=v; save(); }
 
-        // --- EXTRAS ---
+        function renderFichasPanel() {
+            return `<div class="space-y-2 pb-24">${(state.students[state.course]||[]).map(s => `
+                <div onclick="openObsModal('${s}')" class="card p-5 flex justify-between items-center cursor-pointer active:bg-gray-50">
+                    <div class="flex flex-col"><span class="text-[11px] font-black italic text-gray-800 uppercase tracking-tight">${s}</span></div>
+                    <span class="text-blue-100 font-black text-xs">✎</span>
+                </div>`).join('')}</div>`;
+        }
+
         function renderExtraPanel() {
             const students = state.students[state.course] || [];
-            const colTitles = [state.extraTitles[`${state.course}_0`] || 'Título 1', state.extraTitles[`${state.course}_1`] || 'Título 2', state.extraTitles[`${state.course}_2`] || 'Título 3'];
-            return `<div class="card p-4 mb-24 overflow-hidden"><div class="flex items-center mb-5 border-b border-gray-100 pb-3"><div class="flex-1 text-[8px] font-black text-gray-400 uppercase italic">Extras</div><div class="flex gap-4 pr-1">${colTitles.map((t, i) => `<input type="text" value="${t}" onchange="updateExtraTitle(${i}, this.value)" class="w-12 text-[7px] font-black text-blue-600 bg-blue-50 rounded-lg p-2 text-center border-none outline-none uppercase italic shadow-sm" maxlength="10">`).join('')}</div></div><div class="space-y-4">${students.map(s => `<div class="flex items-center pb-1 border-b border-gray-50 last:border-0"><span class="flex-1 text-[10px] font-black text-gray-700 uppercase italic truncate pr-2 tracking-tighter">${s}</span><div class="flex gap-4 pr-1">${[0,1,2].map(i => {const key = `${state.course}_${s}_${i}`; const isActive = state.extraChecks[key]; return `<div onclick="toggleExtra('${key}')" class="check-circle ${isActive?'active':''}">${isActive ? '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path></svg>' : ''}</div>`;}).join('')}</div></div>`).join('')}</div></div>`;
+            const colTitles = [state.extraTitles[`${state.course}_0`] || 'T1', state.extraTitles[`${state.course}_1`] || 'T2', state.extraTitles[`${state.course}_2`] || 'T3'];
+            return `<div class="card p-4 mb-24"><div class="flex items-center mb-4 border-b border-gray-100 pb-2"><div class="flex-1 text-[8px] font-black text-gray-400 uppercase italic">Extras</div><div class="flex gap-4">${colTitles.map((t, i) => `<input type="text" value="${t}" onchange="updateExtraTitle(${i}, this.value)" class="w-12 text-[7px] font-black text-blue-600 bg-blue-50 rounded-lg p-2 text-center outline-none uppercase italic" maxlength="10">`).join('')}</div></div><div class="space-y-4">${students.map(s => `<div class="flex items-center pb-2 border-b border-gray-50 last:border-0"><span class="flex-1 text-[10px] font-black text-gray-700 uppercase italic truncate pr-2">${s}</span><div class="flex gap-4">${[0,1,2].map(i => {const key = `${state.course}_${s}_${i}`; const isActive = state.extraChecks[key]; return `<div onclick="toggleExtra('${key}')" class="w-6 h-6 border-2 rounded-full flex items-center justify-center ${isActive?'bg-blue-600 border-blue-600 text-white':'border-gray-200'}">${isActive?'✓':''}</div>`;}).join('')}</div></div>`).join('')}</div></div>`;
         }
         function updateExtraTitle(idx, val) { state.extraTitles[`${state.course}_${idx}`] = val; save(); }
         function toggleExtra(key) { state.extraChecks[key] = !state.extraChecks[key]; render(); }
 
-        // --- AGENDA / CUMPLE ---
         function renderCalendar(c) {
-            const today = new Date(); const currentYear = today.getFullYear(); let bdays = [];
-            Object.keys(state.birthdays).forEach(key => {
-                const [course, student] = key.split('_'); const bdate = state.birthdays[key];
-                if (bdate) {
-                    const [y, m, d] = bdate.split('-'); let bdayThisYear = new Date(currentYear, m - 1, d);
-                    if (bdayThisYear < new Date(currentYear, today.getMonth(), today.getDate())) { bdayThisYear.setFullYear(currentYear + 1); }
-                    const diffDays = Math.ceil((bdayThisYear - today) / (1000 * 60 * 60 * 24));
-                    bdays.push({ student, course, date: bdayThisYear, diffDays, display: `${d}/${m}` });
-                }
-            });
-            bdays.sort((a, b) => a.diffDays - b.diffDays);
-            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Agenda</h2><div class="space-y-3 pb-24">${bdays.map(b => `<div class="card p-5 flex justify-between items-center ${b.diffDays === 0 ? 'bg-blue-50' : ''}"><div class="flex flex-col"><span class="text-[11px] font-black italic text-gray-800 uppercase">${b.student}</span><span class="text-[8px] font-bold text-gray-400 uppercase">${b.course}</span></div><div class="text-right"><span class="text-[10px] font-black text-blue-600 uppercase">${b.display}</span><div class="mt-1">${b.diffDays === 0 ? '¡HOY!' : b.diffDays <= 7 ? `<span class="text-[7px] font-black text-orange-500">${b.diffDays}d</span>` : ''}</div></div></div>`).join('')}</div>`;
+            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Agenda</h2><div class="space-y-3 pb-24">` + 
+                Object.keys(state.birthdays).map(key => {
+                    const [course, student] = key.split('_');
+                    return `<div class="card p-5 flex justify-between items-center"><div class="flex flex-col"><span class="text-[11px] font-black italic uppercase">${student}</span><span class="text-[8px] font-bold text-gray-400 uppercase">${course}</span></div><span class="text-blue-600 font-black text-[10px]">${state.birthdays[key].split('-').reverse().join('/')}</span></div>`;
+                }).join('') + `</div>`;
         }
 
-        // --- ALUMNOS EDITOR ---
-        function renderAlumEditor() { return `<div class="card p-6 mb-4"><textarea id="bulk-input" class="w-full h-24 bg-gray-50 rounded-2xl p-4 text-xs font-bold outline-none mb-3 border border-gray-100" placeholder="Pega los nombres aquí..."></textarea><button onclick="processImport()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Importar</button></div><div class="space-y-1.5 pb-24">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-3 px-5 rounded-xl border border-gray-100 flex justify-between items-center text-[9px] font-bold text-gray-500 uppercase"><span>${s}</span><button onclick="removeS('${s}')" class="text-red-200">×</button></div>`).join('')}</div>`; }
+        function renderNotes(c) {
+            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Notas</h2><div class="card p-6 mb-6"><textarea id="new-note-text" class="w-full bg-gray-50 rounded-2xl p-5 text-xs font-bold outline-none h-24 mb-4" placeholder="Nota rápida..."></textarea><button onclick="addNote()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Guardar</button></div><div class="space-y-4 pb-32">${state.notes.slice().reverse().map((n, i) => `<div class="bg-white p-5 rounded-2xl border border-gray-100"><p class="text-xs font-bold text-gray-700">${n.text}</p><p class="text-[7px] font-black text-gray-300 mt-2 uppercase">${n.timestamp}</p></div>`).join('')}</div>`;
+        }
+        function addNote() { const el = document.getElementById('new-note-text'); if (!el.value.trim()) return; state.notes.push({ text: el.value.trim(), timestamp: new Date().toLocaleString() }); el.value = ''; render(); }
+
+        function renderSchedule(c) { c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Horarios</h2><div class="text-center py-10 card text-gray-300 font-black italic uppercase text-[10px]">Módulo de Horarios v23</div>`; }
+
+        function renderAlumEditor() { return `<div class="card p-6 mb-4"><textarea id="bulk-input" class="w-full h-24 bg-gray-50 rounded-2xl p-4 text-xs font-bold outline-none mb-3 border border-gray-100" placeholder="Pegar nombres..."></textarea><button onclick="processImport()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Importar</button></div><div class="space-y-1.5 pb-24">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-3 px-5 rounded-xl border border-gray-100 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase"><span>${s}</span><button onclick="removeS('${s}')" class="text-red-200 font-black">×</button></div>`).join('')}</div>`; }
         function processImport() { const input = document.getElementById('bulk-input').value; const names = input.split('\n').map(n => n.trim().replace(/^\d+[\s.-]*/, '')).filter(n => n.length > 2); state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort(); render(); }
         function removeS(name) { state.students[state.course] = state.students[state.course].filter(s => s !== name); render(); }
 
-        // --- HORARIOS ---
-        function renderSchedule(c) {
-            const days = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
-            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase text-gray-900">Horarios</h2><div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4"><button onclick="state.schedTab='mañana';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='mañana'?'bg-white shadow-sm':'text-gray-400'} uppercase">T. Normal</button><button onclick="state.schedTab='contraturno';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='contraturno'?'bg-white shadow-sm':'text-gray-400'} uppercase italic">Contraturno</button></div>${state.schedTab === 'mañana' ? renderNormalSchedule(days) : renderContraturnoSchedule(days)}`;
-        }
-        function renderNormalSchedule(days) { return `<div class="overflow-x-auto no-scrollbar pb-10"><div class="flex gap-2 mb-3"><div class="w-8"></div>${days.map(d => `<div class="flex-1 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">${d}</div>`).join('')}</div>${Array.from({length: 8}, (_, i) => { const h = i + 1; return `<div class="flex gap-2 mb-2"><div class="w-8 h-16 bg-gray-100/50 rounded-xl flex items-center justify-center text-[8px] font-black text-gray-400 italic">${h}°</div>${days.map(d => { const key = `mañana-${d.toLowerCase()}-${h}`; const data = state.schedule[key] || { materia: '+', hora: '', prof: '' }; return `<div onclick="openSchedModal('${key}')" class="flex-1 h-16 bg-white rounded-xl border border-gray-100 flex flex-col items-center justify-center p-1 text-center cursor-pointer"><span class="text-[7px] font-black text-blue-600 uppercase leading-none truncate w-full">${data.materia}</span><span class="text-[6px] font-bold text-gray-400 mt-1">${data.hora}</span></div>`; }).join('')}</div>`; }).join('')}</div>`; }
-        function renderContraturnoSchedule(days) { return `<div class="space-y-3 pb-24">` + days.map(d => { const key = `contra-${d.toLowerCase()}-unica`; const data = state.schedule[key] || { materia: 'LIBRE', hora: '', prof: '' }; return `<div onclick="openSchedModal('${key}')" class="card p-5 flex justify-between items-center"><div class="flex items-center gap-4"><div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black italic text-[11px] uppercase">${d}</div><div><p class="text-[10px] font-black italic text-gray-800 uppercase tracking-tighter">${data.materia}</p></div></div><span class="text-blue-100">✎</span></div>`; }).join('') + `</div>`; }
-        let currentSchedKey = ""; function openSchedModal(key) { currentSchedKey = key; const data = state.schedule[key] || { materia: '', hora: '', prof: '' }; document.getElementById('input-materia').value = data.materia === '+' ? '' : data.materia; document.getElementById('input-hora').value = data.hora; document.getElementById('input-profesor').value = data.prof; document.getElementById('modal-schedule').style.display = 'flex'; }
-        function closeModal() { document.getElementById('modal-schedule').style.display = 'none'; }
-        function saveSched() { state.schedule[currentSchedKey] = { materia: document.getElementById('input-materia').value || '+', hora: document.getElementById('input-hora').value, prof: document.getElementById('input-profesor').value }; closeModal(); render(); }
+        let currentObsTarget = null;
+        function openObsModal(s) { currentObsTarget = s; document.getElementById('obs-student-name').innerText = s; document.getElementById('obs-text-area').value = state.observations[`${state.course}_${s}`] || ""; document.getElementById('obs-birth-date').value = state.birthdays[`${state.course}_${s}`] || ""; document.getElementById('modal-obs').style.display = 'flex'; }
+        function closeObsModal() { document.getElementById('modal-obs').style.display = 'none'; }
+        function saveObs() { state.observations[`${state.course}_${currentObsTarget}`] = document.getElementById('obs-text-area').value; state.birthdays[`${state.course}_${currentObsTarget}`] = document.getElementById('obs-birth-date').value; closeObsModal(); render(); }
 
-        // --- NOTAS ---
-        function renderNotes(c) { c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Notas</h2><div class="card p-6 mb-6"><textarea id="new-note-text" class="w-full bg-gray-50 rounded-2xl p-5 text-xs font-bold outline-none h-32 border border-gray-100 mb-4" placeholder="Nota..."></textarea><button onclick="addNote()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Guardar</button></div><div class="space-y-4 pb-32">${(state.notes).slice().reverse().map((n, i) => `<div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm"><div class="flex justify-between items-center mb-3"><span class="text-[8px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-md">${n.timestamp}</span><button onclick="deleteNote(${state.notes.length - 1 - i})" class="text-red-200">×</button></div><p class="text-xs font-bold text-gray-700 leading-relaxed">${n.text}</p></div>`).join('')}</div>`; }
-        function addNote() { const el = document.getElementById('new-note-text'); if (!el.value.trim()) return; const now = new Date(); state.notes.push({ text: el.value.trim(), timestamp: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }); el.value = ''; render(); }
-        function deleteNote(i) { if(confirm("¿Eliminar?")) { state.notes.splice(i, 1); render(); } }
-
-        window.onload = () => { document.getElementById('header-date').innerText = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase(); render(); };
+        window.onload = () => { render(); };
     </script>
-
-    <!-- MODAL HORARIOS -->
-    <div id="modal-schedule" class="fixed inset-0 z-[200] bg-black/50 hidden items-center justify-center p-6 backdrop-blur-sm">
-        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
-            <h3 class="text-lg font-black italic uppercase mb-4 text-blue-600">Editar Clase</h3>
-            <div class="space-y-4">
-                <input id="input-materia" type="text" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold outline-blue-500" placeholder="Materia">
-                <input id="input-hora" type="text" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold outline-blue-500" placeholder="Hora">
-                <input id="input-profesor" type="hidden">
-            </div>
-            <div class="flex gap-2 mt-6">
-                <button onclick="closeModal()" class="flex-1 py-3 bg-gray-100 rounded-xl text-[10px] font-black uppercase text-gray-400">Cerrar</button>
-                <button onclick="saveSched()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase">Listo</button>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
 
