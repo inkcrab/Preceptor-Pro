@@ -5,26 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Preceptor Pro v23.6</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --ios-bg: #f2f2f7; --accent: #2563eb; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); -webkit-tap-highlight-color: transparent; color: #1c1c1e; }
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        .card { background: white; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
-        .tab-btn { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 10px 4px; border-radius: 12px; transition: all 0.2s; }
-        .tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #2563eb; }
-        .tab-btn.inactive { color: #9ca3af; }
-        .saca-bg { background-color: #fffbeb !important; border-left: 4px solid #f59e0b !important; }
+        .card { background: white; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); overflow: hidden; }
+        
+        /* Colores Específicos de Cursos */
+        .bg-5a-boea { background-color: #f3efff !important; border-left: 8px solid #8b5cf6 !important; }
+        .bg-5b-boea { background-color: #fff1f2 !important; border-left: 8px solid #9f1239 !important; }
+        .bg-5a-boi { background-color: #f0f9ff !important; border-left: 8px solid #0ea5e9 !important; }
+        
+        .tab-btn { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 10px 2px; border-radius: 12px; transition: all 0.2s; flex: 1; text-align: center; }
+        .tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); color: var(--accent); }
+        .tab-btn.inactive { color: #8e8e93; }
+
+        .schedule-grid { display: grid; grid-template-columns: 90px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
+        .schedule-cell { background: white; padding: 6px 2px; text-align: center; font-size: 9px; min-height: 45px; display: flex; flex-direction: column; justify-content: center; }
+        
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .calendar-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 12px; font-size: 11px; font-weight: 700; position: relative; }
+        .has-event::after { content: ''; width: 4px; height: 4px; background: #2563eb; border-radius: 50%; position: absolute; bottom: 4px; }
+        
+        .btn-action { transition: transform 0.1s; }
+        .btn-action:active { transform: scale(0.92); }
+        
+        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-in { animation: slideIn 0.3s ease-out; }
     </style>
 </head>
 <body class="pb-32">
     <div id="app" class="max-w-md mx-auto min-h-screen relative">
         
-        <!-- HEADER SEGÚN CAPTURA -->
-        <header class="px-6 pt-8 pb-4 flex justify-between items-start">
+        <!-- HEADER -->
+        <header class="px-7 pt-10 pb-5 flex justify-between items-start">
             <div>
-                <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">LUNES, 6 ABR</p>
-                <h1 class="text-xl font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500 font-black italic">V23</span></h1>
+                <p id="header-date" class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1"></p>
+                <h1 class="text-2xl font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-600">V23.6</span></h1>
             </div>
             <div class="w-10 h-6 bg-blue-600 rounded flex flex-col overflow-hidden border border-blue-700 shadow-sm mt-1">
                 <div class="flex-1 bg-[#75AADB]"></div>
@@ -33,24 +51,27 @@
             </div>
         </header>
 
-        <!-- CONTENEDOR PRINCIPAL -->
-        <main id="main-view" class="px-5 py-2"></main>
+        <!-- NOTIFICADOR DE EVENTOS -->
+        <div id="event-notice" class="px-5 mb-4 hidden"></div>
 
-        <!-- NAVEGACIÓN INFERIOR ESTILO CAPTURA -->
-        <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] glass rounded-[2.5rem] p-3 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
-            <button onclick="changeTab('home')" class="flex flex-col items-center gap-1" id="nav-home">
+        <!-- VISTA PRINCIPAL -->
+        <main id="main-content" class="px-5 py-2 animate-in"></main>
+
+        <!-- NAV INFERIOR -->
+        <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[92%] glass rounded-[2.5rem] p-3 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
+            <button onclick="nav('home')" class="btn-action flex flex-col items-center gap-1" id="nav-home">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
                 <span class="text-[8px] font-black uppercase tracking-tighter">Cursos</span>
             </button>
-            <button onclick="changeTab('schedule')" class="flex flex-col items-center gap-1" id="nav-schedule">
+            <button onclick="nav('schedule')" class="btn-action flex flex-col items-center gap-1" id="nav-schedule">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-[8px] font-black uppercase tracking-tighter">Horarios</span>
             </button>
-            <button onclick="changeTab('calendar')" class="flex flex-col items-center gap-1" id="nav-calendar">
+            <button onclick="nav('calendar')" class="btn-action flex flex-col items-center gap-1" id="nav-calendar">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 <span class="text-[8px] font-black uppercase tracking-tighter">Agenda</span>
             </button>
-            <button onclick="changeTab('notes')" class="flex flex-col items-center gap-1" id="nav-notes">
+            <button onclick="nav('notes')" class="btn-action flex flex-col items-center gap-1" id="nav-notes">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 <span class="text-[8px] font-black uppercase tracking-tighter">Notas</span>
             </button>
@@ -58,117 +79,281 @@
     </div>
 
     <script>
-        const STORAGE_KEY = 'preceptor_pro_v23_final_storage';
+        const DB_KEY = 'preceptor_pro_v23_omar_final_v2';
+        const hours = ["12:30-13:10", "13:10-13:50", "13:50-14:30", "14:40-15:20", "15:20-16:00", "16:00-16:40", "16:50-17:30", "17:30-18:10"];
+        const weekDays = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+        
         let state = {
-            tab: 'home',
+            view: 'home',
             course: null,
-            subTab: 'asis',
+            subView: 'asis',
+            calDate: new Date(2026, 3, 1), // Abril 2026 default
             students: { 
-                "5° A BOEA": ["Alvarez, Marcos", "Benitez, Juan", "Cabrera, Ana"], 
-                "5° B BOEA": ["Duarte, Sol", "Escobar, Luis"], 
-                "5° A BOI": ["Franco, Raul", "Gomez, Mia"] 
+                "5° A BOEA": ["ALVAREZ, MARCOS", "BENITEZ, CLARA", "GOMEZ, FACUNDO", "LOPEZ, DANIEL"], 
+                "5° B BOEA": ["DUARTE, ELENA", "MARTINEZ, SOL", "PEREZ, HUGO"], 
+                "5° A BOI": ["CASTRO, LUIS", "SANCHEZ, MIA", "VACA, ROBERTO"] 
             },
             attendance: {},
-            referentes: {}
+            checklists: {},
+            checklistLabels: ["Dinero", "Aut.", "Salida"],
+            acapNotes: {},
+            notes: [],
+            schedule: {},
+            events: [
+                { d: 1, m: 0, y: 2026, t: 'Año Nuevo' },
+                { d: 24, m: 2, y: 2026, t: 'Día de la Memoria' },
+                { d: 2, m: 3, y: 2026, t: 'Malvinas' },
+                { d: 1, m: 4, y: 2026, t: 'Día del Trabajador' },
+                { d: 25, m: 4, y: 2026, t: 'Revolución de Mayo' },
+                { d: 20, m: 5, y: 2026, t: 'Día de la Bandera' },
+                { d: 9, m: 6, y: 2026, t: 'Independencia' }
+            ]
         };
 
-        const savedData = localStorage.getItem(STORAGE_KEY);
-        if (savedData) { try { state = JSON.parse(savedData); } catch(e) {} }
+        // Persistencia
+        function load() { const s = localStorage.getItem(DB_KEY); if(s) state = JSON.parse(s); state.calDate = new Date(state.calDate || '2026-04-01'); }
+        function save() { localStorage.setItem(DB_KEY, JSON.stringify(state)); }
 
-        function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-
-        function changeTab(t) { state.tab = t; state.course = null; render(); }
+        function nav(v) { state.view = v; if(v !== 'course') state.course = null; render(); }
+        function setSub(v) { state.subView = v; render(); }
 
         function render() {
-            const container = document.getElementById('main-view');
-            document.querySelectorAll('nav button').forEach(btn => {
-                const id = btn.id.split('-')[1];
-                const isActive = (state.tab === id || (state.tab === 'course' && id === 'home'));
-                btn.style.color = isActive ? '#2563eb' : '#d1d5db';
+            const main = document.getElementById('main-content');
+            const notice = document.getElementById('event-notice');
+            document.getElementById('header-date').innerText = new Date().toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long', year:'numeric'}).toUpperCase();
+
+            // Notificaciones hoy
+            const today = new Date();
+            const todayEv = state.events.filter(e => e.d === today.getDate() && e.m === today.getMonth() && e.y === today.getFullYear());
+            if(todayEv.length > 0) {
+                notice.innerHTML = `<div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex items-center gap-3 animate-bounce">
+                    <span class="text-xl">🇦🇷</span>
+                    <div><p class="text-[8px] font-black uppercase opacity-70">Hoy</p><p class="text-xs font-bold">${todayEv.map(e=>e.t).join(', ')}</p></div>
+                </div>`;
+                notice.classList.remove('hidden');
+            } else { notice.classList.add('hidden'); }
+
+            // Nav icons color
+            document.querySelectorAll('nav button').forEach(b => {
+                const id = b.id.split('-')[1];
+                b.style.color = (state.view === id || (state.view==='course' && id==='home')) ? '#2563eb' : '#c7c7cc';
             });
-            if (state.tab === 'home') renderHome(container);
-            else if (state.tab === 'course') renderCourse(container);
-            else container.innerHTML = `<div class="p-10 text-center text-gray-300 font-black italic uppercase text-[10px]">Módulo en desarrollo</div>`;
+
+            if(state.view === 'home') renderHome(main);
+            else if(state.view === 'course') renderCourse(main);
+            else if(state.view === 'schedule') renderSchedule(main);
+            else if(state.view === 'calendar') renderCalendar(main);
+            else if(state.view === 'notes') renderNotes(main);
             save();
         }
 
         function renderHome(c) {
-            c.innerHTML = `<h2 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6 italic px-1">MIS CURSOS</h2>` +
+            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[3px] mb-6 italic">MIS CURSOS</h2>` +
                 Object.keys(state.students).map(course => `
-                <div onclick="state.tab='course';state.course='${course}';state.subTab='asis';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer active:scale-[0.97] transition-all">
+                <div onclick="state.view='course';state.course='${course}';state.subView='asis';render()" 
+                     class="card p-8 mb-4 flex justify-between items-center cursor-pointer ${getCourseStyle(course)}">
                     <div>
-                        <span class="text-2xl font-black italic text-gray-800 tracking-tighter uppercase leading-none">${course}</span>
-                        <p class="text-[10px] font-black text-blue-500 mt-2 uppercase tracking-tight">${state.students[course].length} ALUMNOS</p>
+                        <span class="text-2xl font-black italic text-gray-800 tracking-tighter uppercase">${course}</span>
+                        <p class="text-[9px] font-black text-blue-600/60 mt-1 uppercase">Control Diario</p>
                     </div>
-                    <span class="text-blue-100 text-lg">→</span>
+                    <span class="text-gray-300 text-2xl font-black">→</span>
                 </div>`).join('');
+        }
+
+        function getCourseStyle(c) {
+            if(c.includes('A BOEA')) return 'bg-5a-boea';
+            if(c.includes('B BOEA')) return 'bg-5b-boea';
+            if(c.includes('BOI')) return 'bg-5a-boi';
+            return '';
         }
 
         function renderCourse(c) {
             c.innerHTML = `
                 <div class="flex items-center gap-4 mb-6">
-                    <button onclick="changeTab('home')" class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-gray-400">←</button>
-                    <h2 class="text-2xl font-black italic uppercase tracking-tighter text-gray-800">${state.course}</h2>
+                    <button onclick="nav('home')" class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">←</button>
+                    <h2 class="text-xl font-black italic uppercase">${state.course}</h2>
                 </div>
-                <div class="flex bg-gray-200/40 p-1 rounded-2xl mb-6 gap-1">
-                    <button onclick="state.subTab='asis';render()" class="flex-1 tab-btn ${state.subTab==='asis'?'active':'inactive'}">Asistencia</button>
-                    <button onclick="state.subTab='refs';render()" class="flex-1 tab-btn ${state.subTab==='refs'?'active':'inactive'}">Referentes</button>
-                    <button onclick="state.subTab='alum';render()" class="flex-1 tab-btn ${state.subTab==='alum'?'active':'inactive'}">Alumnos</button>
+                <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-6 gap-1 overflow-x-auto no-scrollbar">
+                    <button onclick="setSub('asis')" class="tab-btn ${state.subView==='asis'?'active':'inactive'}">Asistencia</button>
+                    <button onclick="setSub('acap')" class="tab-btn ${state.subView==='acap'?'active':'inactive'}">ACAP</button>
+                    <button onclick="setSub('list')" class="tab-btn ${state.subView==='list'?'active':'inactive'}">Listas</button>
+                    <button onclick="setSub('refs')" class="tab-btn ${state.subView==='refs'?'active':'inactive'}">Refs</button>
+                    <button onclick="setSub('alum')" class="tab-btn ${state.subView==='alum'?'active':'inactive'}">Alumnos</button>
                 </div>
-                ${state.subTab === 'asis' ? renderAsisPanel() : (state.subTab === 'refs' ? renderRefs() : renderAlum())}`;
+                <div class="animate-in">${renderSubView()}</div>`;
         }
 
-        function renderAsisPanel() {
-            const today = new Date().toISOString().split('T')[0];
+        function renderSubView() {
             const list = state.students[state.course] || [];
-            if (list.length === 0) return `<div class="p-10 text-center text-gray-300 font-black italic text-[10px]">CARGA ALUMNOS PRIMERO</div>`;
-
-            return `<div class="space-y-3 pb-24">` + list.map(s => {
-                const status = state.attendance[`${state.course}_${s}_${today}`] || '';
+            if(state.subView === 'asis') {
+                return `<div class="space-y-3 pb-20">` + list.map(s => {
+                    const st = state.attendance[`${state.course}_${s}`] || '';
+                    return `<div class="card p-4 flex justify-between items-center px-6 ${st==='S'?'bg-amber-50 border-l-8 border-amber-400':''}">
+                        <span class="font-black text-[11px] uppercase italic text-gray-700 truncate w-32">${s}</span>
+                        <div class="flex gap-1.5">
+                            ${['P','A','J','S'].map(v => `<button onclick="setAsis('${s}','${v}')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${st===v?getBtnColor(v):'bg-gray-50 border-gray-100 text-gray-300'}">${getIcon(v)}</button>`).join('')}
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+            }
+            if(state.subView === 'acap') {
+                return `<div class="space-y-4 pb-20">` + list.map(s => {
+                    const val = state.acapNotes[`${state.course}_${s}`] || '';
+                    return `<div class="card p-5">
+                        <p class="text-[9px] font-black uppercase text-amber-600 mb-2">${s}</p>
+                        <input onchange="state.acapNotes['${state.course}_${s}']=this.value;save()" class="w-full bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Horario / Lugar / Observación ACAP..." value="${val}">
+                    </div>`;
+                }).join('') + `</div>`;
+            }
+            if(state.subView === 'list') {
                 return `
-                <div class="card p-4 flex justify-between items-center px-6 ${status === 'S' ? 'saca-bg' : ''}">
-                    <div class="flex flex-col truncate pr-2">
-                        <span class="font-black text-[12px] uppercase text-gray-800 italic truncate">${s}</span>
-                        ${status === 'S' ? '<span class="text-[7px] font-black text-amber-600 uppercase italic">● TRABAJO / ACAP</span>' : ''}
-                    </div>
-                    <div class="flex gap-1.5">
-                        <button onclick="setAsis('${s}','P')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300 border-gray-100'}">P</button>
-                        <button onclick="setAsis('${s}','A')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300 border-gray-100'}">A</button>
-                        <button onclick="setAsis('${s}','J')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='J'?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-300 border-gray-100'} flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                        </button>
-                        <button onclick="setAsis('${s}','S')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='S'?'bg-amber-500 text-white border-amber-500':'bg-gray-50 text-gray-300 border-gray-100'} flex items-center justify-center">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                        </button>
-                    </div>
-                </div>`;
-            }).join('') + `</div>`;
-        }
-
-        function setAsis(s, t) { const d = new Date().toISOString().split('T')[0]; const k = `${state.course}_${s}_${d}`; state.attendance[k] = (state.attendance[k]===t) ? '' : t; render(); }
-
-        function renderRefs() {
-            const r = state.referentes[state.course] || { d: "", p: "" };
-            return `<div class="space-y-4">
-                <div class="card p-6 border-l-4 border-l-blue-600">
-                    <label class="text-[9px] font-black text-blue-600 uppercase italic mb-2 block">Delegados</label>
-                    <textarea onchange="saveR('${state.course}','d',this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${r.d}</textarea>
+                <div class="card p-3 mb-4 flex gap-2">
+                    ${state.checklistLabels.map((l,i) => `<input onchange="state.checklistLabels[${i}]=this.value;save()" class="flex-1 bg-gray-100 p-2 text-[8px] font-black uppercase text-center rounded-lg border-none" value="${l}">`).join('')}
                 </div>
-                <div class="card p-6 border-l-4 border-l-green-500">
-                    <label class="text-[9px] font-black text-green-600 uppercase italic mb-2 block">Referentes</label>
-                    <textarea onchange="saveR('${state.course}','p',this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${r.p}</textarea>
-                </div></div>`;
+                <div class="space-y-2 pb-20">` + list.map(s => {
+                    const ck = state.checklists[`${state.course}_${s}`] || [false, false, false];
+                    return `<div class="card p-4 flex justify-between items-center px-6">
+                        <span class="font-black text-[10px] uppercase italic text-gray-600">${s}</span>
+                        <div class="flex gap-5">
+                            ${ck.map((v, i) => `<input type="checkbox" ${v?'checked':''} onchange="toggleCk('${s}',${i})" class="w-5 h-5 accent-blue-600">`).join('')}
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+            }
+            if(state.subView === 'refs') {
+                const r = state.referentes[state.course] || {d:'', p:''};
+                return `<div class="space-y-4">
+                    <div class="card p-6 border-l-4 border-blue-500"><label class="text-[9px] font-black text-blue-600 uppercase mb-2 block tracking-widest italic">Delegados</label>
+                    <textarea onchange="state.referentes['${state.course}'].d=this.value;save()" class="w-full bg-gray-50 p-3 rounded-xl text-xs font-bold border-none h-20">${r.d}</textarea></div>
+                    <div class="card p-6 border-l-4 border-green-500"><label class="text-[9px] font-black text-green-600 uppercase mb-2 block tracking-widest italic">Referentes</label>
+                    <textarea onchange="state.referentes['${state.course}'].p=this.value;save()" class="w-full bg-gray-50 p-3 rounded-xl text-xs font-bold border-none h-20">${r.p}</textarea></div>
+                </div>`;
+            }
+            return `<div class="card p-6 mb-6"><textarea id="imp" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-20 mb-3" placeholder="Pegar lista..."></textarea><button onclick="procAlum()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Cargar Lista</button></div>`;
         }
-        function saveR(c, f, v) { if(!state.referentes[c]) state.referentes[c]={d:"",p:""}; state.referentes[c][f]=v; save(); }
 
-        function renderAlum() {
-            return `<div class="card p-6 mb-4"><textarea id="imp" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20 mb-3" placeholder="Pegar lista..."></textarea><button onclick="procImp()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Importar</button></div>
-            <div class="space-y-2 pb-24">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-3 px-5 rounded-xl border border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase"><span>${s}</span><button onclick="remS('${s}')" class="text-red-200 font-black">×</button></div>`).join('')}</div>`;
+        function getIcon(v) { 
+            if(v==='J') return '🩺'; 
+            if(v==='S') return '💼'; 
+            return v; 
         }
-        function procImp() { const v = document.getElementById('imp').value; if(!v) return; const ns = v.split('\n').map(n => n.trim()).filter(n => n.length>2); state.students[state.course] = [...new Set([...(state.students[state.course]||[]), ...ns])].sort(); render(); }
-        function remS(n) { state.students[state.course] = state.students[state.course].filter(x => x!==n); render(); }
+        function getBtnColor(v) {
+            if(v==='P') return 'bg-green-500 border-green-500 text-white shadow-lg shadow-green-100';
+            if(v==='A') return 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-100';
+            if(v==='J') return 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-100';
+            if(v==='S') return 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-100';
+        }
 
-        window.onload = () => { render(); };
+        function setAsis(s, v) { const k = `${state.course}_${s}`; state.attendance[k] = state.attendance[k] === v ? '' : v; render(); }
+        function toggleCk(s, i) { const k = `${state.course}_${s}`; if(!state.checklists[k]) state.checklists[k]=[false,false,false]; state.checklists[k][i]=!state.checklists[k][i]; save(); }
+
+        function renderSchedule(c) {
+            if(!state.course) {
+                c.innerHTML = `<h2 class="text-xl font-black italic mb-6 uppercase">HORARIOS POR CURSO</h2>` + 
+                Object.keys(state.students).map(cur => `<button onclick="state.course='${cur}';render()" class="card p-6 mb-3 w-full text-left font-black italic uppercase text-sm ${getCourseStyle(cur)}">${cur} →</button>`).join('');
+                return;
+            }
+            c.innerHTML = `<div class="flex items-center gap-4 mb-4"><button onclick="state.course=null;render()" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-lg font-black italic uppercase">${state.course}</h2></div>
+            <div class="card p-1 overflow-x-auto">
+                <div class="schedule-grid" style="min-width:550px">
+                    <div class="schedule-cell font-black bg-gray-50 text-[8px] uppercase">Hora</div>
+                    ${weekDays.map(d => `<div class="schedule-cell font-black bg-gray-50 text-[8px] uppercase">${d}</div>`).join('')}
+                    ${hours.map((h, i) => `
+                        <div class="schedule-cell font-black bg-gray-50 text-[8px]">${h}</div>
+                        ${weekDays.map(d => {
+                            const k = `${state.course}_${d}_${i}`;
+                            const val = state.schedule[k] || {m:'', p:''};
+                            return `<div class="schedule-cell">
+                                <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-blue-600 border-none p-0 text-[8px] bg-transparent" placeholder="Mat." value="${val.m}">
+                                <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 border-none p-0 text-[7px] bg-transparent uppercase" placeholder="Prof." value="${val.p}">
+                            </div>`;
+                        }).join('')}
+                    `).join('')}
+                    <!-- CONTRATURNO -->
+                    <div class="schedule-cell bg-orange-50"><input onchange="saveS('${state.course}_ct_h','h',this.value)" class="w-full text-center font-black text-orange-600 bg-transparent border-none text-[8px]" value="${state.schedule[state.course+'_ct_h']?.h || '18:10...'}"></div>
+                    ${weekDays.map(d => {
+                        const k = `${state.course}_${d}_CT`;
+                        const val = state.schedule[k] || {m:'', p:''};
+                        return `<div class="schedule-cell bg-orange-50">
+                            <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-orange-600 border-none p-0 text-[8px] bg-transparent" placeholder="Contraturno" value="${val.m}">
+                            <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 border-none p-0 text-[7px] bg-transparent uppercase" placeholder="Prof." value="${val.p}">
+                        </div>`;
+                    }).join('')}
+                </div>
+            </div>`;
+        }
+        function saveS(k, f, v) { if(!state.schedule[k]) state.schedule[k]={m:'',p:'',h:''}; state.schedule[k][f]=v; save(); }
+
+        function renderCalendar(c) {
+            const m = state.calDate.getMonth();
+            const y = state.calDate.getFullYear();
+            const first = new Date(y, m, 1).getDay();
+            const daysInM = new Date(y, m + 1, 0).getDate();
+            const months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+            c.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <div><h2 class="text-2xl font-black italic uppercase">${months[m]}</h2><p class="text-[10px] font-black text-blue-600 tracking-widest">${y}</p></div>
+                    <div class="flex gap-2">
+                        <button onclick="changeMonth(-1)" class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">←</button>
+                        <button onclick="changeMonth(1)" class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">→</button>
+                    </div>
+                </div>
+                <div class="card p-5 mb-6">
+                    <div class="calendar-grid mb-4">
+                        ${['D','L','M','X','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300">${d}</div>`).join('')}
+                        ${Array(first).fill('0').map(()=>`<div></div>`).join('')}
+                        ${Array.from({length: daysInM}, (_,i)=>i+1).map(d => {
+                            const hasEv = state.events.some(e => e.d===d && e.m===m && e.y===y);
+                            return `<div onclick="showDay(${d},${m},${y})" class="calendar-day ${hasEv?'bg-blue-50 text-blue-600':''} cursor-pointer">${d}</div>`;
+                        }).join('')}
+                    </div>
+                </div>
+                <div id="day-events" class="space-y-3"></div>`;
+        }
+        
+        function changeMonth(v) { state.calDate.setMonth(state.calDate.getMonth() + v); render(); }
+
+        function showDay(d, m, y) {
+            const evs = state.events.filter(e => e.d===d && e.m===m && e.y===y);
+            const list = document.getElementById('day-events');
+            list.innerHTML = `
+                <div class="flex justify-between items-center mb-2 px-2"><span class="text-[10px] font-black uppercase text-gray-400 italic">${d}/${m+1}/${y}</span><button onclick="addEv(${d},${m},${y})" class="text-blue-600 font-black text-[9px] uppercase">+ Añadir</button></div>
+                ${evs.length===0 ? '<p class="text-center text-gray-300 font-black text-[9px] py-4 uppercase italic">Sin eventos</p>' : 
+                evs.map(e => `<div class="card p-4 flex justify-between items-center"><p class="text-xs font-bold text-gray-700">${e.t}</p><button onclick="delEv(${e.d},${e.m},${e.y},'${e.t}')" class="text-red-200">×</button></div>`).join('')}`;
+        }
+
+        function addEv(d,m,y) { const t = prompt("Evento / Cumple / Reunión:"); if(t) { state.events.push({d,m,y,t}); render(); showDay(d,m,y); } }
+        function delEv(d,m,y,t) { state.events = state.events.filter(e => !(e.d===d && e.m===m && e.y===y && e.t===t)); render(); showDay(d,m,y); }
+
+        function renderNotes(c) {
+            c.innerHTML = `<h2 class="text-xl font-black italic uppercase mb-6">Bloc de Notas</h2>
+                <div class="card p-6 mb-6">
+                    <textarea id="n-in" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-24 mb-4" placeholder="Escribir nota..."></textarea>
+                    <button onclick="addNote()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Guardar Nota</button>
+                </div>
+                <div class="space-y-4 pb-20">
+                    ${state.notes.slice().reverse().map(n => `<div class="card p-6"><p class="text-xs font-bold text-gray-700 mb-3 leading-relaxed">${n.txt}</p><p class="text-[7px] font-black text-gray-400 uppercase tracking-tighter italic">📅 ${n.date}</p></div>`).join('')}
+                </div>`;
+        }
+
+        function addNote() {
+            const v = document.getElementById('n-in').value;
+            if(!v) return;
+            const now = new Date();
+            state.notes.push({ txt: v, date: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) });
+            render();
+        }
+
+        function procAlum() {
+            const v = document.getElementById('imp').value;
+            if(!v) return;
+            const ns = v.split('\n').map(x => x.trim().toUpperCase()).filter(x => x.length>2);
+            state.students[state.course] = [...new Set([...(state.students[state.course]||[]), ...ns])].sort();
+            render();
+        }
+
+        window.onload = () => { load(); render(); };
     </script>
 </body>
 </html>
