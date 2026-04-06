@@ -3,338 +3,318 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Docente Pro - Gestión Escolar</title>
+    <title>Preceptor Pro v23</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        :root { --ios-bg: #f2f2f7; }
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--ios-bg); 
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); }
-        .card { 
-            background: white; 
-            border-radius: 2.2rem; 
-            box-shadow: 0 10px 40px rgba(0,0,0,0.03); 
-            border: 1px solid rgba(255,255,255,0.7); 
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
-        }
-        .card:active { transform: scale(0.97); opacity: 0.9; }
-        
-        .color-violeta { color: #7c3aed; }
-        .color-bordo { color: #800000; }
-        .color-azul { color: #1d4ed8; }
-
-        .btn-p { background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
-        .btn-a { background: #ef4444; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
-        .btn-j { background: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
-        .btn-empty { background: #f1f5f9; color: #94a3b8; }
-
-        .dot-obs { background: #facc15; }
-        .dot-aper { background: #f97316; }
-        .dot-susp { background: #ef4444; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-view { animation: fadeIn 0.35s ease-out; }
+        :root { --ios-bg: #f2f2f7; --accent: #2563eb; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); -webkit-tap-highlight-color: transparent; }
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+        .card { background: white; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* Safe area for iPhone notches */
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .cell-asis { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 900; border-radius: 6px; }
+        .day-btn:active { background-color: #e0e7ff; transform: scale(0.9); }
     </style>
 </head>
-<body class="pb-40">
-    <div id="app" class="max-w-md mx-auto min-h-screen relative overflow-x-hidden">
+<body class="pb-32">
+    <div id="app" class="max-w-md mx-auto min-h-screen relative">
         
         <!-- HEADER -->
-        <header class="glass sticky top-0 z-50 px-7 py-7 border-b border-gray-200/40 flex justify-between items-end">
+        <header class="glass sticky top-0 z-50 px-6 py-4 border-b border-gray-200/30 flex justify-between items-center">
             <div>
-                <p id="header-date" class="text-[10px] font-black text-blue-500 uppercase tracking-[0.25em] mb-1"></p>
-                <h1 class="text-3xl font-black italic text-gray-900 tracking-tighter uppercase leading-none">DOCENTE PRO</h1>
+                <p id="header-date" class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-0.5"></p>
+                <h1 class="text-lg font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500">v23</span></h1>
             </div>
-            <div class="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full border border-white shadow-sm">
-                <div id="bat-dot" class="w-2 h-2 rounded-full bg-green-500"></div>
-                <span id="bat-level" class="text-[10px] font-black text-gray-700">--%</span>
+            <div class="w-8 h-5 bg-blue-600 rounded flex flex-col overflow-hidden border border-blue-700 shadow-sm">
+                <div class="flex-1 bg-[#75AADB]"></div>
+                <div class="flex-1 bg-white"></div>
+                <div class="flex-1 bg-[#75AADB]"></div>
             </div>
         </header>
 
-        <!-- CONTENIDO PRINCIPAL -->
-        <main id="main-view" class="px-6 py-6"></main>
+        <main id="main-view" class="px-4 py-4"></main>
 
-        <!-- NAV BAR -->
-        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] glass rounded-[3rem] p-2.5 flex justify-around items-center shadow-[0_25px_60px_rgba(0,0,0,0.18)] border border-white/50 z-[100] pb-safe">
-            <button onclick="changeTab('home')" id="btn-home" class="flex-1 py-3 text-blue-600 transition-all flex flex-col items-center gap-1">
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-                <span class="text-[9px] font-black uppercase">Cursos</span>
+        <!-- NAVEGACIÓN -->
+        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] glass rounded-[2rem] p-2 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
+            <button onclick="changeTab('home')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-300" id="nav-home">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">Cursos</span>
             </button>
-            <button onclick="changeTab('schedule')" id="btn-schedule" class="flex-1 py-3 text-gray-300 transition-all flex flex-col items-center gap-1">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span class="text-[9px] font-black uppercase">Horario</span>
+            <button onclick="changeTab('schedule')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-300" id="nav-schedule">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">Horarios</span>
             </button>
-            <button onclick="changeTab('notes')" id="btn-notes" class="flex-1 py-3 text-gray-300 transition-all flex flex-col items-center gap-1">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                <span class="text-[9px] font-black uppercase">Agenda</span>
+            <button onclick="changeTab('calendar')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-300" id="nav-calendar">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="text-[8px] font-bold uppercase tracking-tighter">Agenda</span>
             </button>
         </nav>
+    </div>
 
-        <!-- MODAL -->
-        <div id="modal" class="fixed inset-0 bg-black/50 backdrop-blur-md z-[200] hidden items-center justify-center p-6">
-            <div id="modal-content" class="bg-white w-full max-w-sm rounded-[3rem] p-9 shadow-2xl animate-view"></div>
+    <!-- MODAL PARA EVENTOS (Nuevo) -->
+    <div id="modal-event" class="fixed inset-0 z-[200] bg-black/50 hidden items-center justify-center p-6 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
+            <h3 class="text-lg font-black italic uppercase mb-1 text-blue-600">Agendar Evento</h3>
+            <p id="event-modal-date" class="text-[10px] font-bold text-gray-400 uppercase mb-4 tracking-wider"></p>
+            <textarea id="input-event-text" class="w-full bg-gray-50 border-none rounded-xl p-4 text-sm font-bold mt-1 outline-blue-500 h-24" placeholder="Ej: Excursión, Examen, Feriado..."></textarea>
+            <div class="flex gap-2 mt-6">
+                <button onclick="closeEventModal()" class="flex-1 py-3 bg-gray-100 rounded-xl text-[10px] font-black uppercase">Cancelar</button>
+                <button onclick="saveEvent()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-200">Guardar</button>
+            </div>
         </div>
+    </div>
 
+    <!-- MODAL PARA HORARIOS (Existente) -->
+    <div id="modal-schedule" class="fixed inset-0 z-[200] bg-black/50 hidden items-center justify-center p-6 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
+            <h3 class="text-lg font-black italic uppercase mb-4 text-blue-600">Editar Clase</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[9px] font-black uppercase text-gray-400">Materia / Actividad</label>
+                    <input id="input-materia" type="text" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold mt-1 outline-blue-500" placeholder="Ej: Matemática">
+                </div>
+                <div>
+                    <label class="text-[9px] font-black uppercase text-gray-400">Horario (Desde - Hasta)</label>
+                    <input id="input-hora" type="text" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold mt-1 outline-blue-500" placeholder="Ej: 07:30 a 08:50">
+                </div>
+                <div>
+                    <label class="text-[9px] font-black uppercase text-gray-400">Profesor</label>
+                    <input id="input-profesor" type="text" class="w-full bg-gray-50 border-none rounded-xl p-3 text-sm font-bold mt-1 outline-blue-500" placeholder="Ej: Pérez, Juan">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="closeModal()" class="flex-1 py-3 bg-gray-100 rounded-xl text-[10px] font-black uppercase">Cancelar</button>
+                <button onclick="saveSched()" class="flex-1 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase">Guardar</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        const STORAGE_KEY = 'docente_pro_v15_prod';
-        const courseConfig = {
-            "5° A BOEA": { color: "color-violeta" },
-            "5° B BOEA": { color: "color-bordo" },
-            "5° A BOI": { color: "color-azul" }
-        };
-
+        const STORAGE_KEY = 'preceptor_pro_v23_data';
         let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
             tab: 'home',
             course: null,
             subTab: 'asis',
-            courses: Object.keys(courseConfig),
-            students: {
-                "5° A BOEA": ["Alvarez, Marcos", "Benitez, Sofia", "Casares, Julián", "Zarate, Elena"],
-                "5° B BOEA": [],
-                "5° A BOI": []
-            },
+            asisView: 'dia',
+            students: { "5° A BOEA": [], "5° B BOEA": [], "5° A BOI": [] },
             attendance: {},
-            discipline: {},
             schedule: {},
-            notes: []
+            events: { 
+                "2026-04-02": "Día del Veterano y de los Caídos en la Guerra de Malvinas",
+                "2026-05-01": "Día del Trabajador",
+                "2026-05-25": "Día de la Revolución de Mayo"
+            },
+            schedTab: 'mañana'
         };
+
+        let currentSchedKey = null;
+        let selectedEventDate = null;
 
         function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
         function changeTab(t) { state.tab = t; state.course = null; render(); }
-        function openCourse(c) { state.tab = 'course'; state.course = c; state.subTab = 'asis'; render(); }
 
         function render() {
             const container = document.getElementById('main-view');
-            ['home', 'schedule', 'notes'].forEach(t => {
-                const btn = document.getElementById(`btn-${t}`);
-                if (!btn) return;
-                const isActive = (state.tab === t || (state.tab === 'course' && t === 'home'));
-                btn.className = isActive ? "flex-1 py-3 text-blue-600 flex flex-col items-center scale-110 font-bold" : "flex-1 py-3 text-gray-300 flex flex-col items-center";
+            document.querySelectorAll('nav button').forEach(btn => {
+                const id = btn.id.split('-')[1];
+                btn.className = (state.tab === id || (state.tab === 'course' && id === 'home')) ? 
+                    "flex-1 py-2 flex flex-col items-center gap-1 text-blue-600 font-bold" : 
+                    "flex-1 py-2 flex flex-col items-center gap-1 text-gray-300";
             });
 
             if (state.tab === 'home') renderHome(container);
             if (state.tab === 'course') renderCourse(container);
             if (state.tab === 'schedule') renderSchedule(container);
-            if (state.tab === 'notes') renderNotes(container);
+            if (state.tab === 'calendar') renderCalendar(container);
             save();
         }
 
+        // --- FUNCIONES CURSOS Y ASISTENCIA ---
         function renderHome(c) {
-            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-6 ml-2 italic">Mis Cursos</h2><div class="grid gap-5 animate-view">` + 
-                state.courses.map(course => {
-                    const textColor = courseConfig[course]?.color || 'text-gray-900';
-                    return `
-                    <div onclick="openCourse('${course}')" class="card p-9 flex justify-between items-center cursor-pointer">
-                        <span class="text-2xl font-black italic tracking-tighter ${textColor}">${course}</span>
-                        <div class="text-right">
-                            <span class="block text-[10px] font-black text-blue-500 uppercase tracking-widest">${state.students[course]?.length || 0} ALUMNOS</span>
-                        </div>
-                    </div>`;
-                }).join('') + `</div>`;
+            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 italic">Mis Cursos</h2>` +
+                Object.keys(state.students).map(course => `
+                <div onclick="state.tab='course';state.course='${course}';render()" class="card p-6 mb-3 flex justify-between items-center cursor-pointer active:scale-95 transition-all">
+                    <div><span class="text-xl font-black italic text-gray-800 tracking-tighter uppercase leading-none">${course}</span><p class="text-[9px] font-bold text-blue-500 mt-1 uppercase">${state.students[course].length} Alumnos</p></div><span class="text-blue-200">→</span></div>`).join('');
         }
 
         function renderCourse(c) {
-            const courseName = state.course;
-            const students = state.students[courseName] || [];
-            const titleColor = courseConfig[courseName]?.color || 'text-gray-900';
-            c.innerHTML = `
-                <div class="animate-view">
-                    <div class="flex items-center gap-5 mb-8">
-                        <button onclick="changeTab('home')" class="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-md text-gray-400">←</button>
-                        <h2 class="text-2xl font-black italic tracking-tighter ${titleColor}">${courseName}</h2>
-                    </div>
-                    <div class="flex bg-gray-200/60 p-1.5 rounded-[2.2rem] mb-6 shadow-inner">
-                        ${['asis', 'conv', 'alum'].map(t => `
-                            <button onclick="state.subTab='${t}';render()" class="flex-1 py-3.5 rounded-[1.8rem] text-[10px] font-black uppercase transition-all ${state.subTab===t?'bg-blue-600 text-white shadow-xl':'text-gray-400'}">
-                                ${t==='asis'?'Asis':t==='conv'?'Conducta':'Alumnos'}
-                            </button>
-                        `).join('')}
-                    </div>
-                    ${state.subTab === 'conv' ? `
-                        <div class="bg-white/80 p-4 rounded-3xl border border-gray-100 mb-6 flex justify-around items-center shadow-sm">
-                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-obs"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Observación</span></div>
-                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-aper"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Apercibimiento</span></div>
-                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-susp"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Suspensión</span></div>
-                        </div>
-                    ` : ''}
-                    <div class="space-y-3 pb-24">
-                        ${renderSubTab(courseName, students)}
-                    </div>
-                </div>`;
+            c.innerHTML = `<div class="flex items-center gap-4 mb-4"><button onclick="changeTab('home')" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-xl font-black italic uppercase tracking-tighter">${state.course}</h2></div><div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4"><button onclick="state.subTab='asis';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.subTab==='asis'?'bg-white shadow-sm':'text-gray-400'} uppercase tracking-tight">Asistencia</button><button onclick="state.subTab='alum';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.subTab==='alum'?'bg-white shadow-sm':'text-gray-400'} uppercase tracking-tight">Alumnos</button></div>${state.subTab === 'asis' ? renderAsisPanel() : renderAlumEditor()}`;
         }
 
-        function renderSubTab(c, students) {
-            if (state.subTab === 'asis') {
-                const today = new Date().toISOString().split('T')[0];
-                return students.map(s => {
-                    const status = state.attendance[`${c}_${s}_${today}`] || '';
-                    const logs = state.discipline[`${c}_${s}`] || [];
-                    const hasObs = logs.some(l => l.type === 'obs');
-                    const hasAper = logs.some(l => l.type === 'aper');
-                    const hasSusp = logs.some(l => l.type === 'susp');
+        function renderAsisPanel() {
+            return `<div class="flex bg-blue-50 p-1 rounded-xl mb-4 border border-blue-100"><button onclick="state.asisView='dia';render()" class="flex-1 py-1.5 text-[9px] font-black rounded-lg ${state.asisView==='dia'?'bg-blue-600 text-white shadow-sm':'text-blue-400'} uppercase">Día</button><button onclick="state.asisView='semana';render()" class="flex-1 py-1.5 text-[9px] font-black rounded-lg ${state.asisView==='semana'?'bg-blue-600 text-white shadow-sm':'text-blue-400'} uppercase">Semana</button><button onclick="state.asisView='mes';render()" class="flex-1 py-1.5 text-[9px] font-black rounded-lg ${state.asisView==='mes'?'bg-blue-600 text-white shadow-sm':'text-blue-400'} uppercase">Mes</button></div>${renderCurrentAsisView()}`;
+        }
 
-                    let btnClass = 'btn-empty';
-                    let label = '---';
-                    if(status === 'P') { btnClass = 'btn-p'; label = 'PRESENTE'; }
-                    if(status === 'A') { btnClass = 'btn-a'; label = 'AUSENTE'; }
-                    if(status === 'J') { btnClass = 'btn-j'; label = 'JUSTIFICADA'; }
+        function renderCurrentAsisView() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const students = state.students[state.course] || [];
+            if (state.asisView === 'dia') {
+                return `<div class="space-y-2">` + students.map(s => {
+                    const status = state.attendance[`${state.course}_${s}_${todayStr}`] || '';
+                    return `<div class="card p-4 flex justify-between items-center px-6"><span class="font-bold text-[10px] uppercase text-gray-700 italic truncate pr-4">${s}</span><div class="flex gap-1.5"><button onclick="setAsis('${s}','P')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300 border-gray-100'}">P</button><button onclick="setAsis('${s}','A')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300 border-gray-100'}">A</button><button onclick="setAsis('${s}','J')" class="w-8 h-8 rounded-lg font-black text-[10px] border ${status==='J'?'bg-orange-500 text-white border-orange-500':'bg-gray-50 text-gray-300 border-gray-100'}">J</button></div></div>`;
+                }).join('') + `</div>`;
+            }
+            if (state.asisView === 'semana') {
+                const days = []; for(let i=6; i>=0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days.push(d.toISOString().split('T')[0]); }
+                return `<div class="card p-4 overflow-x-auto no-scrollbar"><table class="w-full text-left"><thead><tr><th class="text-[8px] font-black text-gray-400 uppercase p-1">Alumno</th>${days.map(d => `<th class="text-[7px] font-black text-gray-400 uppercase p-1 text-center">${d.split('-')[2]}</th>`).join('')}</tr></thead><tbody>${students.map(s => `<tr><td class="text-[9px] font-bold text-gray-600 p-1 border-b border-gray-50 uppercase truncate max-w-[80px] italic">${s}</td>${days.map(d => { const st = state.attendance[`${state.course}_${s}_${d}`] || '-'; const color = st==='P'?'text-green-500':st==='A'?'text-red-500':st==='J'?'text-orange-500':'text-gray-200'; return `<td class="text-[8px] font-black ${color} p-1 text-center border-b border-gray-50">${st}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+            }
+            if (state.asisView === 'mes') {
+                const now = new Date(); const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); const dayNumbers = Array.from({length: totalDays}, (_, i) => i + 1);
+                return `<div class="card p-4 overflow-x-auto no-scrollbar"><table class="w-full text-left" style="min-width: 600px;"><thead><tr><th class="sticky left-0 bg-white text-[8px] font-black text-gray-400 uppercase p-1">Alumno</th>${dayNumbers.map(n => `<th class="text-[7px] font-black text-gray-400 uppercase p-1 text-center">${n}</th>`).join('')}</tr></thead><tbody>${students.map(s => `<tr><td class="sticky left-0 bg-white text-[9px] font-bold text-gray-600 p-1 border-b border-gray-50 uppercase truncate italic">${s}</td>${dayNumbers.map(n => { const dStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(n).padStart(2,'0')}`; const st = state.attendance[`${state.course}_${s}_${dStr}`] || ''; const color = st==='P'?'bg-green-100 text-green-700':st==='A'?'bg-red-100 text-red-700':st==='J'?'bg-orange-100 text-orange-700':''; return `<td class="p-0.5 border-b border-gray-50"><div class="cell-asis ${color}">${st}</div></td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
+            }
+        }
 
-                    return `<div class="card p-5 flex justify-between items-center px-7">
-                        <div class="flex flex-col">
-                            <span class="font-black text-xs italic text-gray-700 uppercase">${s}</span>
-                            <div class="flex gap-1 mt-1">
-                                ${hasObs ? '<div class="w-2 h-2 rounded-full dot-obs"></div>' : ''}
-                                ${hasAper ? '<div class="w-2 h-2 rounded-full dot-aper"></div>' : ''}
-                                ${hasSusp ? '<div class="w-2 h-2 rounded-full dot-susp"></div>' : ''}
+        function setAsis(s, type) { const today = new Date().toISOString().split('T')[0]; const key = `${state.course}_${s}_today`; state.attendance[key] = (state.attendance[key] === type) ? '' : type; render(); }
+
+        function renderAlumEditor() {
+            return `<div class="card p-5 mb-4"><textarea id="bulk-input" class="w-full h-24 bg-gray-50 rounded-xl p-3 text-xs font-bold outline-none mb-3 border border-gray-100" placeholder="Pega lista..."></textarea><button onclick="processImport()" class="w-full bg-blue-600 text-white py-3 rounded-xl text-[10px] font-black uppercase">Importar</button></div><div class="space-y-1.5">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-2.5 px-4 rounded-xl border border-gray-100 flex justify-between items-center"><span class="text-[9px] font-bold text-gray-500 uppercase italic">${s}</span><button onclick="removeS('${s}')" class="text-red-300 font-black text-[10px]">×</button></div>`).join('')}</div>`;
+        }
+
+        function processImport() { const input = document.getElementById('bulk-input').value; const names = input.split('\n').map(n => n.trim().replace(/^\d+[\s.-]*/, '')).filter(n => n.length > 2); state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort(); render(); }
+        function removeS(name) { state.students[state.course] = state.students[state.course].filter(s => s !== name); render(); }
+
+        // --- FUNCIONES HORARIOS ---
+        function renderSchedule(c) {
+            const days = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
+            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Cronograma</h2><div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4"><button onclick="state.schedTab='mañana';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='mañana'?'bg-white shadow-sm':'text-gray-400'} uppercase">T. Normal</button><button onclick="state.schedTab='contraturno';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='contraturno'?'bg-white shadow-sm':'text-gray-400'} uppercase italic">Contraturno</button></div>${state.schedTab === 'mañana' ? renderNormalSchedule(days) : renderContraturnoSchedule(days)}`;
+        }
+
+        function renderNormalSchedule(days) {
+            return `<div class="overflow-x-auto no-scrollbar pb-10"><div class="flex gap-2 mb-3"><div class="w-8"></div>${days.map(d => `<div class="flex-1 text-center text-[9px] font-black text-gray-400 uppercase tracking-widest">${d}</div>`).join('')}</div>${Array.from({length: 8}, (_, i) => { const h = i + 1; return `<div class="flex gap-2 mb-2"><div class="w-8 h-16 bg-gray-100/50 rounded-xl flex items-center justify-center text-[8px] font-black text-gray-400 italic">${h}°</div>${days.map(d => { const key = `mañana-${d.toLowerCase()}-${h}`; const data = state.schedule[key] || { materia: '+', hora: '', prof: '' }; return `<div onclick="openSchedModal('${key}')" class="flex-1 h-16 bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center p-1 text-center overflow-hidden cursor-pointer active:bg-gray-50"><span class="text-[7px] font-black text-blue-600 uppercase leading-none truncate w-full">${data.materia}</span><span class="text-[6px] font-bold text-gray-400 mt-1">${data.hora}</span><span class="text-[5px] font-black text-gray-300 mt-0.5 truncate uppercase">${data.prof}</span></div>`; }).join('')}</div>`; }).join('')}</div>`;
+        }
+
+        function renderContraturnoSchedule(days) {
+            return `<div class="space-y-3 pb-20">` + days.map(d => { const key = `contra-${d.toLowerCase()}-unica`; const data = state.schedule[key] || { materia: 'SIN ACTIVIDAD', hora: '', prof: '' }; return `<div onclick="openSchedModal('${key}')" class="card p-5 flex justify-between items-center cursor-pointer active:scale-95 transition-all"><div class="flex items-center gap-4"><div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center font-black italic text-[11px] uppercase">${d}</div><div><p class="text-[10px] font-black italic text-gray-800 uppercase tracking-tighter">${data.materia}</p><div class="flex gap-3 mt-0.5"><span class="text-[8px] font-bold text-blue-500 uppercase tracking-tight">${data.hora || '--:--'}</span><span class="text-[8px] font-bold text-gray-300 uppercase tracking-tight">${data.prof || 'Sin Prof.'}</span></div></div></div><span class="text-blue-100">✎</span></div>`; }).join('') + `</div>`;
+        }
+
+        function openSchedModal(key) { currentSchedKey = key; const data = state.schedule[key] || { materia: '', hora: '', prof: '' }; document.getElementById('input-materia').value = data.materia === '+' ? '' : data.materia; document.getElementById('input-hora').value = data.hora; document.getElementById('input-profesor').value = data.prof; document.getElementById('modal-schedule').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal-schedule').style.display = 'none'; }
+        function saveSched() { state.schedule[currentSchedKey] = { materia: document.getElementById('input-materia').value || '+', hora: document.getElementById('input-hora').value, prof: document.getElementById('input-profesor').value }; closeModal(); render(); }
+
+        // --- CALENDARIO Y AGENDA v23 ---
+        function renderCalendar(c) {
+            const date = new Date();
+            const m = date.getMonth();
+            const y = 2026;
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            const firstDay = new Date(y, m, 1).getDay();
+
+            // Lógica de Alertas de Notificación
+            const alerts = [];
+            const now = new Date();
+            Object.entries(state.events).forEach(([dStr, txt]) => {
+                const evDate = new Date(dStr + "T00:00:00");
+                const diffTime = evDate - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                if (diffDays >= 0 && diffDays <= 3) {
+                    alerts.push({ days: diffDays, text: txt, date: dStr });
+                }
+            });
+
+            c.innerHTML = `
+                <h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Agenda Escolar</h2>
+
+                <!-- ALERTAS DE NOTIFICACIÓN -->
+                ${alerts.length > 0 ? `
+                <div class="mb-6 space-y-2">
+                    ${alerts.map(a => `
+                        <div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex items-center gap-4 animate-bounce">
+                            <div class="bg-white/20 p-2 rounded-lg">🔔</div>
+                            <div class="flex-1">
+                                <p class="text-[8px] font-black uppercase opacity-70">Aviso Próximo (${a.days === 0 ? 'Hoy' : 'En ' + a.days + ' días'})</p>
+                                <p class="text-[11px] font-black uppercase italic leading-none">${a.text}</p>
                             </div>
-                        </div>
-                        <button onclick="cycleAttendance('${s}')" class="w-28 py-3 rounded-2xl font-black text-[9px] tracking-widest transition-all ${btnClass}">${label}</button>
-                    </div>`;
-                }).join('');
-            }
-            if (state.subTab === 'conv') {
-                return students.map(s => {
-                    const logs = state.discipline[`${c}_${s}`] || [];
-                    return `<div class="card p-7 mb-4">
-                        <div class="flex justify-between items-start mb-4">
-                            <div>
-                                <span class="font-black italic text-gray-900 uppercase text-xs block mb-1">${s}</span>
-                                <div class="flex flex-wrap gap-1">
-                                    ${logs.map(l => `<div class="w-2.5 h-2.5 rounded-full ${l.type==='obs'?'dot-obs':l.type==='aper'?'dot-aper':'dot-susp'}"></div>`).join('')}
-                                </div>
-                            </div>
-                            <button onclick="addSancion('${s}')" class="bg-gray-900 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">+ Sanción</button>
-                        </div>
-                        <div class="space-y-2 border-t border-gray-50 pt-4">
-                            ${logs.map((l) => `
-                                <div class="flex gap-3 items-start">
-                                    <div class="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${l.type==='obs'?'dot-obs':l.type==='aper'?'dot-aper':'dot-susp'}"></div>
-                                    <p class="text-[11px] font-bold text-gray-600 italic">"${l.text}" <span class="text-[8px] opacity-40 not-italic ml-1">${l.date}</span></p>
-                                </div>`).join('')}
-                            ${logs.length === 0 ? '<p class="text-[9px] font-bold text-gray-300 italic py-2">Sin historial registrado</p>' : ''}
-                        </div>
-                    </div>`;
-                }).join('');
-            }
-            if (state.subTab === 'alum') {
-                return `
-                <div class="bg-blue-50 border-2 border-blue-100 p-8 rounded-[2.5rem] mb-8">
-                    <h4 class="text-[10px] font-black text-blue-600 uppercase mb-4 tracking-widest text-center italic">Importar desde Word/PDF</h4>
-                    <textarea id="bulk-input" class="w-full h-32 p-5 rounded-3xl border-none font-bold text-sm bg-white shadow-inner mb-4 outline-none" placeholder="Copia y pega la lista de nombres aquí..."></textarea>
-                    <button onclick="processBulkImport()" class="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-[11px] shadow-xl">IMPORTAR CURSO</button>
-                </div>
-                <div class="px-2">
-                    <h4 class="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic text-center">Gestionar Alumnos</h4>
-                    ${students.map(s => `
-                        <div class="flex justify-between items-center bg-white/60 p-4 rounded-2xl border border-gray-100 mb-2 px-6 shadow-sm">
-                            <span class="text-[10px] font-black italic text-gray-500 uppercase">${s}</span>
-                            <button onclick="removeStudent('${s}')" class="text-red-300 font-black text-[9px] tracking-tighter">ELIMINAR</button>
                         </div>
                     `).join('')}
-                </div>`;
-            }
+                </div>
+                ` : ''}
+
+                <!-- CALENDARIO -->
+                <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 px-1">${monthNames[m]} ${y}</h3>
+                <div class="card p-6 mb-6">
+                    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;" class="mb-4">
+                        ${['D','L','M','M','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300 uppercase">${d}</div>`).join('')}
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">
+                        ${Array(firstDay).fill('').map(()=>`<div></div>`).join('')}
+                        ${Array.from({length: daysInMonth}, (_, i) => {
+                            const dNum = i + 1;
+                            const dStr = `${y}-${String(m+1).padStart(2,'0')}-${String(dNum).padStart(2,'0')}`;
+                            const isToday = dStr === now.toISOString().split('T')[0];
+                            const event = state.events[dStr];
+                            
+                            return `
+                                <div onclick="openEventModal('${dStr}')" class="day-btn aspect-square rounded-xl flex flex-col items-center justify-center text-[12px] font-black cursor-pointer transition-all relative ${isToday ? 'bg-blue-600 text-white shadow-xl scale-105 z-10' : event ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}">
+                                    ${dNum}
+                                    ${event ? '<div class="absolute bottom-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></div>' : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <p class="text-[8px] text-center text-gray-400 font-bold uppercase mt-4 italic tracking-widest">Toca un día para agregar o editar eventos</p>
+                </div>
+
+                <!-- LISTADO DE EVENTOS DEL MES -->
+                <div class="space-y-3 pb-24">
+                    <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Eventos del mes</h3>
+                    ${Object.entries(state.events)
+                        .filter(([d]) => d.startsWith(`${y}-${String(m+1).padStart(2,'0')}`))
+                        .sort()
+                        .map(([d, txt]) => `
+                            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-start gap-4 active:scale-95 transition-all" onclick="openEventModal('${d}')">
+                                <div class="bg-blue-50 text-blue-600 w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
+                                    <span class="text-[8px] font-black leading-none uppercase">${monthNames[m].substring(0,3)}</span>
+                                    <span class="text-[14px] font-black leading-none mt-0.5">${d.split('-')[2]}</span>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-[11px] font-black italic text-gray-800 uppercase tracking-tight leading-tight">${txt}</p>
+                                    <div class="flex gap-4 mt-2">
+                                        <button class="text-[8px] font-black text-blue-400 uppercase tracking-widest">Editar</button>
+                                        <button onclick="event.stopPropagation(); deleteEvent('${d}')" class="text-[8px] font-black text-red-300 uppercase tracking-widest">Eliminar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('') || '<p class="text-[10px] text-gray-300 italic p-4 text-center">No hay eventos agendados.</p>'}
+                </div>
+            `;
         }
 
-        // --- ACCIONES CORE ---
-        function processBulkImport() {
-            const input = document.getElementById('bulk-input').value;
-            if(!input.trim()) return;
-            const names = input.split('\n')
-                .map(n => n.trim().replace(/^\d+[\s.-]*/, '')) // Limpia números de lista
-                .filter(n => n.length > 2);
-            state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort();
-            document.getElementById('bulk-input').value = '';
+        function openEventModal(dateStr) {
+            selectedEventDate = dateStr;
+            const current = state.events[dateStr] || "";
+            document.getElementById('event-modal-date').innerText = `Día ${dateStr.split('-')[2]} de ${dateStr.split('-')[1]}`;
+            document.getElementById('input-event-text').value = current;
+            document.getElementById('modal-event').style.display = 'flex';
+            setTimeout(() => document.getElementById('input-event-text').focus(), 100);
+        }
+
+        function closeEventModal() {
+            document.getElementById('modal-event').style.display = 'none';
+        }
+
+        function saveEvent() {
+            const val = document.getElementById('input-event-text').value.trim();
+            if (val === "") {
+                delete state.events[selectedEventDate];
+            } else {
+                state.events[selectedEventDate] = val;
+            }
+            closeEventModal();
             render();
         }
 
-        function removeStudent(s) {
-            if(confirm(`¿Deseas eliminar a ${s}?`)) {
-                state.students[state.course] = state.students[state.course].filter(n => n !== s);
+        function deleteEvent(dateStr) {
+            if(confirm("¿Eliminar este evento?")) {
+                delete state.events[dateStr];
                 render();
             }
         }
 
-        function cycleAttendance(s) {
-            const today = new Date().toISOString().split('T')[0];
-            const key = `${state.course}_${s}_${today}`;
-            const current = state.attendance[key] || '';
-            const cycle = { '': 'P', 'P': 'A', 'A': 'J', 'J': '' };
-            state.attendance[key] = cycle[current];
-            render();
-        }
-
-        function addSancion(s) {
-            const m = document.getElementById('modal');
-            const c = document.getElementById('modal-content');
-            m.style.display = 'flex';
-            c.innerHTML = `
-                <h3 class="text-2xl font-black italic text-gray-900 mb-6 uppercase tracking-tighter">Registrar</h3>
-                <p class="text-[10px] font-black text-blue-500 uppercase mb-5">${s}</p>
-                <select id="s-type" class="w-full p-5 bg-gray-100 rounded-2xl font-black mb-4 outline-none">
-                    <option value="obs">Observación</option>
-                    <option value="aper">Apercibimiento</option>
-                    <option value="susp">Suspensión</option>
-                </select>
-                <textarea id="s-text" class="w-full h-32 p-5 bg-gray-100 rounded-2xl font-bold mb-8 outline-none" placeholder="Motivo..."></textarea>
-                <div class="flex gap-3">
-                    <button onclick="document.getElementById('modal').style.display='none'" class="flex-1 font-black text-[11px] text-gray-400">SALIR</button>
-                    <button onclick="saveSancion('${s}')" class="flex-[2] bg-gray-900 text-white py-5 rounded-[2rem] font-black text-[11px]">GUARDAR</button>
-                </div>`;
-        }
-
-        function saveSancion(s) {
-            const type = document.getElementById('s-type').value;
-            const text = document.getElementById('s-text').value;
-            if(!text) return;
-            const key = `${state.course}_${s}`;
-            if(!state.discipline[key]) state.discipline[key] = [];
-            state.discipline[key].push({ type, text, date: new Date().toLocaleDateString('es-ES').slice(0,5) });
-            document.getElementById('modal').style.display = 'none';
-            render();
-        }
-
-        function renderSchedule(c) {
-            let days = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
-            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-7 px-2 italic">Grilla Horaria</h2><div class="animate-view overflow-x-auto no-scrollbar pb-10">` +
-                `<div class="schedule-grid mb-4 flex gap-2"><div class="w-10"></div>${days.map(d => `<div class="flex-1 text-center text-[9px] font-black text-gray-400">${d}</div>`).join('')}</div>` +
-                Array.from({length:8}, (_,i) => i+1).map(h => `<div class="flex gap-2 mb-2.5"><div class="w-10 h-16 bg-gray-200/40 rounded-2xl flex items-center justify-center text-[11px] font-black text-gray-400 italic">${h}°</div>${days.map(d => `<div onclick="editSchedule('${d.toLowerCase()}-${h}')" class="flex-1 h-16 bg-white rounded-2xl p-1 flex flex-col justify-center items-center text-center shadow-sm border border-white active:scale-95 transition-all overflow-hidden cursor-pointer"><span class="text-[8px] font-black text-blue-600 leading-tight break-words w-full px-1">${state.schedule[d.toLowerCase()+'-'+h]?.m || '+'}</span></div>`).join('')}</div>`).join('') + `</div>`;
-        }
-
-        function renderNotes(c) {
-            c.innerHTML = `<div class="flex justify-between items-center mb-9 px-2"><h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">Agenda</h2><button onclick="addNote()" class="bg-blue-600 text-white px-6 py-3 rounded-full font-black text-[10px] shadow-xl tracking-widest">+ NOTA</button></div><div class="space-y-5 animate-view">${state.notes.map(n => `<div class="card p-8 relative"><p class="font-bold text-gray-800 text-sm italic leading-relaxed">"${n.text}"</p><div class="flex justify-between items-center mt-6 border-t pt-4 border-gray-50"><span class="text-[9px] font-black text-gray-300 uppercase italic">${n.date}</span><button onclick="deleteNote(${n.id})" class="text-red-200 font-bold text-[9px] uppercase tracking-widest">Borrar</button></div></div>`).join('')}</div>`;
-        }
-
-        function editSchedule(key) { const m = prompt("Materia/Curso:"); if(m !== null) state.schedule[key] = { m }; render(); }
-        function addNote() { const txt = prompt("Nueva nota:"); if(txt) { state.notes.unshift({ id: Date.now(), text: txt, date: new Date().toLocaleDateString('es-ES') }); render(); } }
-        function deleteNote(id) { state.notes = state.notes.filter(n => n.id !== id); render(); }
-
-        // Batería
-        if (navigator.getBattery) {
-            navigator.getBattery().then(b => {
-                const u = () => {
-                    const level = Math.round(b.level * 100);
-                    document.getElementById('bat-level').innerText = level + "%";
-                    document.getElementById('bat-dot').className = `w-2 h-2 rounded-full ${level < 20 ? 'bg-red-500' : 'bg-green-500'}`;
-                };
-                u(); b.onlevelchange = u;
-            });
-        }
-        
         window.onload = () => {
-            const dateStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-            document.getElementById('header-date').innerText = dateStr.toUpperCase();
+            const d = new Date();
+            document.getElementById('header-date').innerText = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
             render();
         };
     </script>
