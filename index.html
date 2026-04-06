@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Docente Pro - Gestión Escolar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --ios-bg: #f2f2f7; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--ios-bg); 
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .glass { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); }
+        .card { 
+            background: white; 
+            border-radius: 2.2rem; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.03); 
+            border: 1px solid rgba(255,255,255,0.7); 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        .card:active { transform: scale(0.97); opacity: 0.9; }
+        
+        .color-violeta { color: #7c3aed; }
+        .color-bordo { color: #800000; }
+        .color-azul { color: #1d4ed8; }
+
+        .btn-p { background: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+        .btn-a { background: #ef4444; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3); }
+        .btn-j { background: #f59e0b; color: white; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3); }
+        .btn-empty { background: #f1f5f9; color: #94a3b8; }
+
+        .dot-obs { background: #facc15; }
+        .dot-aper { background: #f97316; }
+        .dot-susp { background: #ef4444; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-view { animation: fadeIn 0.35s ease-out; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* Safe area for iPhone notches */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="pb-40">
+    <div id="app" class="max-w-md mx-auto min-h-screen relative overflow-x-hidden">
+        
+        <!-- HEADER -->
+        <header class="glass sticky top-0 z-50 px-7 py-7 border-b border-gray-200/40 flex justify-between items-end">
+            <div>
+                <p id="header-date" class="text-[10px] font-black text-blue-500 uppercase tracking-[0.25em] mb-1"></p>
+                <h1 class="text-3xl font-black italic text-gray-900 tracking-tighter uppercase leading-none">DOCENTE PRO</h1>
+            </div>
+            <div class="flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full border border-white shadow-sm">
+                <div id="bat-dot" class="w-2 h-2 rounded-full bg-green-500"></div>
+                <span id="bat-level" class="text-[10px] font-black text-gray-700">--%</span>
+            </div>
+        </header>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main id="main-view" class="px-6 py-6"></main>
+
+        <!-- NAV BAR -->
+        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] glass rounded-[3rem] p-2.5 flex justify-around items-center shadow-[0_25px_60px_rgba(0,0,0,0.18)] border border-white/50 z-[100] pb-safe">
+            <button onclick="changeTab('home')" id="btn-home" class="flex-1 py-3 text-blue-600 transition-all flex flex-col items-center gap-1">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                <span class="text-[9px] font-black uppercase">Cursos</span>
+            </button>
+            <button onclick="changeTab('schedule')" id="btn-schedule" class="flex-1 py-3 text-gray-300 transition-all flex flex-col items-center gap-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="text-[9px] font-black uppercase">Horario</span>
+            </button>
+            <button onclick="changeTab('notes')" id="btn-notes" class="flex-1 py-3 text-gray-300 transition-all flex flex-col items-center gap-1">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <span class="text-[9px] font-black uppercase">Agenda</span>
+            </button>
+        </nav>
+
+        <!-- MODAL -->
+        <div id="modal" class="fixed inset-0 bg-black/50 backdrop-blur-md z-[200] hidden items-center justify-center p-6">
+            <div id="modal-content" class="bg-white w-full max-w-sm rounded-[3rem] p-9 shadow-2xl animate-view"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'docente_pro_v15_prod';
+        const courseConfig = {
+            "5° A BOEA": { color: "color-violeta" },
+            "5° B BOEA": { color: "color-bordo" },
+            "5° A BOI": { color: "color-azul" }
+        };
+
+        let state = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+            tab: 'home',
+            course: null,
+            subTab: 'asis',
+            courses: Object.keys(courseConfig),
+            students: {
+                "5° A BOEA": ["Alvarez, Marcos", "Benitez, Sofia", "Casares, Julián", "Zarate, Elena"],
+                "5° B BOEA": [],
+                "5° A BOI": []
+            },
+            attendance: {},
+            discipline: {},
+            schedule: {},
+            notes: []
+        };
+
+        function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+        function changeTab(t) { state.tab = t; state.course = null; render(); }
+        function openCourse(c) { state.tab = 'course'; state.course = c; state.subTab = 'asis'; render(); }
+
+        function render() {
+            const container = document.getElementById('main-view');
+            ['home', 'schedule', 'notes'].forEach(t => {
+                const btn = document.getElementById(`btn-${t}`);
+                if (!btn) return;
+                const isActive = (state.tab === t || (state.tab === 'course' && t === 'home'));
+                btn.className = isActive ? "flex-1 py-3 text-blue-600 flex flex-col items-center scale-110 font-bold" : "flex-1 py-3 text-gray-300 flex flex-col items-center";
+            });
+
+            if (state.tab === 'home') renderHome(container);
+            if (state.tab === 'course') renderCourse(container);
+            if (state.tab === 'schedule') renderSchedule(container);
+            if (state.tab === 'notes') renderNotes(container);
+            save();
+        }
+
+        function renderHome(c) {
+            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-6 ml-2 italic">Mis Cursos</h2><div class="grid gap-5 animate-view">` + 
+                state.courses.map(course => {
+                    const textColor = courseConfig[course]?.color || 'text-gray-900';
+                    return `
+                    <div onclick="openCourse('${course}')" class="card p-9 flex justify-between items-center cursor-pointer">
+                        <span class="text-2xl font-black italic tracking-tighter ${textColor}">${course}</span>
+                        <div class="text-right">
+                            <span class="block text-[10px] font-black text-blue-500 uppercase tracking-widest">${state.students[course]?.length || 0} ALUMNOS</span>
+                        </div>
+                    </div>`;
+                }).join('') + `</div>`;
+        }
+
+        function renderCourse(c) {
+            const courseName = state.course;
+            const students = state.students[courseName] || [];
+            const titleColor = courseConfig[courseName]?.color || 'text-gray-900';
+            c.innerHTML = `
+                <div class="animate-view">
+                    <div class="flex items-center gap-5 mb-8">
+                        <button onclick="changeTab('home')" class="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-md text-gray-400">←</button>
+                        <h2 class="text-2xl font-black italic tracking-tighter ${titleColor}">${courseName}</h2>
+                    </div>
+                    <div class="flex bg-gray-200/60 p-1.5 rounded-[2.2rem] mb-6 shadow-inner">
+                        ${['asis', 'conv', 'alum'].map(t => `
+                            <button onclick="state.subTab='${t}';render()" class="flex-1 py-3.5 rounded-[1.8rem] text-[10px] font-black uppercase transition-all ${state.subTab===t?'bg-blue-600 text-white shadow-xl':'text-gray-400'}">
+                                ${t==='asis'?'Asis':t==='conv'?'Conducta':'Alumnos'}
+                            </button>
+                        `).join('')}
+                    </div>
+                    ${state.subTab === 'conv' ? `
+                        <div class="bg-white/80 p-4 rounded-3xl border border-gray-100 mb-6 flex justify-around items-center shadow-sm">
+                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-obs"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Observación</span></div>
+                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-aper"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Apercibimiento</span></div>
+                            <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full dot-susp"></div><span class="text-[8px] font-black text-gray-500 uppercase tracking-tighter">Suspensión</span></div>
+                        </div>
+                    ` : ''}
+                    <div class="space-y-3 pb-24">
+                        ${renderSubTab(courseName, students)}
+                    </div>
+                </div>`;
+        }
+
+        function renderSubTab(c, students) {
+            if (state.subTab === 'asis') {
+                const today = new Date().toISOString().split('T')[0];
+                return students.map(s => {
+                    const status = state.attendance[`${c}_${s}_${today}`] || '';
+                    const logs = state.discipline[`${c}_${s}`] || [];
+                    const hasObs = logs.some(l => l.type === 'obs');
+                    const hasAper = logs.some(l => l.type === 'aper');
+                    const hasSusp = logs.some(l => l.type === 'susp');
+
+                    let btnClass = 'btn-empty';
+                    let label = '---';
+                    if(status === 'P') { btnClass = 'btn-p'; label = 'PRESENTE'; }
+                    if(status === 'A') { btnClass = 'btn-a'; label = 'AUSENTE'; }
+                    if(status === 'J') { btnClass = 'btn-j'; label = 'JUSTIFICADA'; }
+
+                    return `<div class="card p-5 flex justify-between items-center px-7">
+                        <div class="flex flex-col">
+                            <span class="font-black text-xs italic text-gray-700 uppercase">${s}</span>
+                            <div class="flex gap-1 mt-1">
+                                ${hasObs ? '<div class="w-2 h-2 rounded-full dot-obs"></div>' : ''}
+                                ${hasAper ? '<div class="w-2 h-2 rounded-full dot-aper"></div>' : ''}
+                                ${hasSusp ? '<div class="w-2 h-2 rounded-full dot-susp"></div>' : ''}
+                            </div>
+                        </div>
+                        <button onclick="cycleAttendance('${s}')" class="w-28 py-3 rounded-2xl font-black text-[9px] tracking-widest transition-all ${btnClass}">${label}</button>
+                    </div>`;
+                }).join('');
+            }
+            if (state.subTab === 'conv') {
+                return students.map(s => {
+                    const logs = state.discipline[`${c}_${s}`] || [];
+                    return `<div class="card p-7 mb-4">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="font-black italic text-gray-900 uppercase text-xs block mb-1">${s}</span>
+                                <div class="flex flex-wrap gap-1">
+                                    ${logs.map(l => `<div class="w-2.5 h-2.5 rounded-full ${l.type==='obs'?'dot-obs':l.type==='aper'?'dot-aper':'dot-susp'}"></div>`).join('')}
+                                </div>
+                            </div>
+                            <button onclick="addSancion('${s}')" class="bg-gray-900 text-white px-4 py-2 rounded-xl text-[9px] font-black uppercase shadow-lg">+ Sanción</button>
+                        </div>
+                        <div class="space-y-2 border-t border-gray-50 pt-4">
+                            ${logs.map((l) => `
+                                <div class="flex gap-3 items-start">
+                                    <div class="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${l.type==='obs'?'dot-obs':l.type==='aper'?'dot-aper':'dot-susp'}"></div>
+                                    <p class="text-[11px] font-bold text-gray-600 italic">"${l.text}" <span class="text-[8px] opacity-40 not-italic ml-1">${l.date}</span></p>
+                                </div>`).join('')}
+                            ${logs.length === 0 ? '<p class="text-[9px] font-bold text-gray-300 italic py-2">Sin historial registrado</p>' : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            if (state.subTab === 'alum') {
+                return `
+                <div class="bg-blue-50 border-2 border-blue-100 p-8 rounded-[2.5rem] mb-8">
+                    <h4 class="text-[10px] font-black text-blue-600 uppercase mb-4 tracking-widest text-center italic">Importar desde Word/PDF</h4>
+                    <textarea id="bulk-input" class="w-full h-32 p-5 rounded-3xl border-none font-bold text-sm bg-white shadow-inner mb-4 outline-none" placeholder="Copia y pega la lista de nombres aquí..."></textarea>
+                    <button onclick="processBulkImport()" class="w-full bg-blue-600 text-white py-5 rounded-[2rem] font-black text-[11px] shadow-xl">IMPORTAR CURSO</button>
+                </div>
+                <div class="px-2">
+                    <h4 class="text-[9px] font-black text-gray-400 uppercase mb-4 tracking-widest italic text-center">Gestionar Alumnos</h4>
+                    ${students.map(s => `
+                        <div class="flex justify-between items-center bg-white/60 p-4 rounded-2xl border border-gray-100 mb-2 px-6 shadow-sm">
+                            <span class="text-[10px] font-black italic text-gray-500 uppercase">${s}</span>
+                            <button onclick="removeStudent('${s}')" class="text-red-300 font-black text-[9px] tracking-tighter">ELIMINAR</button>
+                        </div>
+                    `).join('')}
+                </div>`;
+            }
+        }
+
+        // --- ACCIONES CORE ---
+        function processBulkImport() {
+            const input = document.getElementById('bulk-input').value;
+            if(!input.trim()) return;
+            const names = input.split('\n')
+                .map(n => n.trim().replace(/^\d+[\s.-]*/, '')) // Limpia números de lista
+                .filter(n => n.length > 2);
+            state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort();
+            document.getElementById('bulk-input').value = '';
+            render();
+        }
+
+        function removeStudent(s) {
+            if(confirm(`¿Deseas eliminar a ${s}?`)) {
+                state.students[state.course] = state.students[state.course].filter(n => n !== s);
+                render();
+            }
+        }
+
+        function cycleAttendance(s) {
+            const today = new Date().toISOString().split('T')[0];
+            const key = `${state.course}_${s}_${today}`;
+            const current = state.attendance[key] || '';
+            const cycle = { '': 'P', 'P': 'A', 'A': 'J', 'J': '' };
+            state.attendance[key] = cycle[current];
+            render();
+        }
+
+        function addSancion(s) {
+            const m = document.getElementById('modal');
+            const c = document.getElementById('modal-content');
+            m.style.display = 'flex';
+            c.innerHTML = `
+                <h3 class="text-2xl font-black italic text-gray-900 mb-6 uppercase tracking-tighter">Registrar</h3>
+                <p class="text-[10px] font-black text-blue-500 uppercase mb-5">${s}</p>
+                <select id="s-type" class="w-full p-5 bg-gray-100 rounded-2xl font-black mb-4 outline-none">
+                    <option value="obs">Observación</option>
+                    <option value="aper">Apercibimiento</option>
+                    <option value="susp">Suspensión</option>
+                </select>
+                <textarea id="s-text" class="w-full h-32 p-5 bg-gray-100 rounded-2xl font-bold mb-8 outline-none" placeholder="Motivo..."></textarea>
+                <div class="flex gap-3">
+                    <button onclick="document.getElementById('modal').style.display='none'" class="flex-1 font-black text-[11px] text-gray-400">SALIR</button>
+                    <button onclick="saveSancion('${s}')" class="flex-[2] bg-gray-900 text-white py-5 rounded-[2rem] font-black text-[11px]">GUARDAR</button>
+                </div>`;
+        }
+
+        function saveSancion(s) {
+            const type = document.getElementById('s-type').value;
+            const text = document.getElementById('s-text').value;
+            if(!text) return;
+            const key = `${state.course}_${s}`;
+            if(!state.discipline[key]) state.discipline[key] = [];
+            state.discipline[key].push({ type, text, date: new Date().toLocaleDateString('es-ES').slice(0,5) });
+            document.getElementById('modal').style.display = 'none';
+            render();
+        }
+
+        function renderSchedule(c) {
+            let days = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
+            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-7 px-2 italic">Grilla Horaria</h2><div class="animate-view overflow-x-auto no-scrollbar pb-10">` +
+                `<div class="schedule-grid mb-4 flex gap-2"><div class="w-10"></div>${days.map(d => `<div class="flex-1 text-center text-[9px] font-black text-gray-400">${d}</div>`).join('')}</div>` +
+                Array.from({length:8}, (_,i) => i+1).map(h => `<div class="flex gap-2 mb-2.5"><div class="w-10 h-16 bg-gray-200/40 rounded-2xl flex items-center justify-center text-[11px] font-black text-gray-400 italic">${h}°</div>${days.map(d => `<div onclick="editSchedule('${d.toLowerCase()}-${h}')" class="flex-1 h-16 bg-white rounded-2xl p-1 flex flex-col justify-center items-center text-center shadow-sm border border-white active:scale-95 transition-all overflow-hidden cursor-pointer"><span class="text-[8px] font-black text-blue-600 leading-tight break-words w-full px-1">${state.schedule[d.toLowerCase()+'-'+h]?.m || '+'}</span></div>`).join('')}</div>`).join('') + `</div>`;
+        }
+
+        function renderNotes(c) {
+            c.innerHTML = `<div class="flex justify-between items-center mb-9 px-2"><h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] italic">Agenda</h2><button onclick="addNote()" class="bg-blue-600 text-white px-6 py-3 rounded-full font-black text-[10px] shadow-xl tracking-widest">+ NOTA</button></div><div class="space-y-5 animate-view">${state.notes.map(n => `<div class="card p-8 relative"><p class="font-bold text-gray-800 text-sm italic leading-relaxed">"${n.text}"</p><div class="flex justify-between items-center mt-6 border-t pt-4 border-gray-50"><span class="text-[9px] font-black text-gray-300 uppercase italic">${n.date}</span><button onclick="deleteNote(${n.id})" class="text-red-200 font-bold text-[9px] uppercase tracking-widest">Borrar</button></div></div>`).join('')}</div>`;
+        }
+
+        function editSchedule(key) { const m = prompt("Materia/Curso:"); if(m !== null) state.schedule[key] = { m }; render(); }
+        function addNote() { const txt = prompt("Nueva nota:"); if(txt) { state.notes.unshift({ id: Date.now(), text: txt, date: new Date().toLocaleDateString('es-ES') }); render(); } }
+        function deleteNote(id) { state.notes = state.notes.filter(n => n.id !== id); render(); }
+
+        // Batería
+        if (navigator.getBattery) {
+            navigator.getBattery().then(b => {
+                const u = () => {
+                    const level = Math.round(b.level * 100);
+                    document.getElementById('bat-level').innerText = level + "%";
+                    document.getElementById('bat-dot').className = `w-2 h-2 rounded-full ${level < 20 ? 'bg-red-500' : 'bg-green-500'}`;
+                };
+                u(); b.onlevelchange = u;
+            });
+        }
+        
+        window.onload = () => {
+            const dateStr = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+            document.getElementById('header-date').innerText = dateStr.toUpperCase();
+            render();
+        };
+    </script>
+</body>
+</html>
+
+```
