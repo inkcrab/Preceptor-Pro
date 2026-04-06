@@ -32,9 +32,10 @@
             </div>
         </header>
 
+        <!-- CONTENEDOR PRINCIPAL DINÁMICO -->
         <main id="main-view" class="px-4 py-4"></main>
 
-        <!-- NAVEGACIÓN ACTUALIZADA CON NOTAS -->
+        <!-- NAVEGACIÓN INFERIOR -->
         <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] glass rounded-[2rem] p-2 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
             <button onclick="changeTab('home')" class="flex-1 py-2 flex flex-col items-center gap-1 text-gray-300" id="nav-home">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
@@ -55,7 +56,7 @@
         </nav>
     </div>
 
-    <!-- MODALES (Sin cambios en lógica) -->
+    <!-- MODALES -->
     <div id="modal-event" class="fixed inset-0 z-[200] bg-black/50 hidden items-center justify-center p-6 backdrop-blur-sm">
         <div class="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl">
             <h3 class="text-lg font-black italic uppercase mb-1 text-blue-600">Agendar Evento</h3>
@@ -107,10 +108,16 @@
 
         function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
-        function changeTab(t) { state.tab = t; state.course = null; render(); }
+        function changeTab(t) { 
+            state.tab = t; 
+            state.course = null; 
+            render(); 
+        }
 
         function render() {
             const container = document.getElementById('main-view');
+            
+            // Actualizar estado visual de los botones de navegación
             document.querySelectorAll('nav button').forEach(btn => {
                 const id = btn.id.split('-')[1];
                 btn.className = (state.tab === id || (state.tab === 'course' && id === 'home')) ? 
@@ -118,15 +125,17 @@
                     "flex-1 py-2 flex flex-col items-center gap-1 text-gray-300";
             });
 
+            // Lógica de ruteo interno
             if (state.tab === 'home') renderHome(container);
             if (state.tab === 'course') renderCourse(container);
             if (state.tab === 'schedule') renderSchedule(container);
             if (state.tab === 'calendar') renderCalendar(container);
             if (state.tab === 'notes') renderNotes(container);
+            
             save();
         }
 
-        // --- MISMAS FUNCIONES DE ANTES ---
+        // --- RENDERIZADO DE SECCIONES ---
         function renderHome(c) {
             c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 italic">Mis Cursos</h2>` +
                 Object.keys(state.students).map(course => `
@@ -166,7 +175,7 @@
         function processImport() { const input = document.getElementById('bulk-input').value; const names = input.split('\n').map(n => n.trim().replace(/^\d+[\s.-]*/, '')).filter(n => n.length > 2); state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort(); render(); }
         function removeS(name) { state.students[state.course] = state.students[state.course].filter(s => s !== name); render(); }
 
-        // --- FUNCIONES HORARIOS ---
+        // --- HORARIOS ---
         function renderSchedule(c) {
             const days = ['LUN', 'MAR', 'MIE', 'JUE', 'VIE'];
             c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Cronograma</h2><div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4"><button onclick="state.schedTab='mañana';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='mañana'?'bg-white shadow-sm':'text-gray-400'} uppercase">T. Normal</button><button onclick="state.schedTab='contraturno';render()" class="flex-1 py-2 text-[10px] font-black rounded-xl ${state.schedTab==='contraturno'?'bg-white shadow-sm':'text-gray-400'} uppercase italic">Contraturno</button></div>${state.schedTab === 'mañana' ? renderNormalSchedule(days) : renderContraturnoSchedule(days)}`;
@@ -177,7 +186,7 @@
         function closeModal() { document.getElementById('modal-schedule').style.display = 'none'; }
         function saveSched() { state.schedule[currentSchedKey] = { materia: document.getElementById('input-materia').value || '+', hora: document.getElementById('input-hora').value, prof: document.getElementById('input-profesor').value }; closeModal(); render(); }
 
-        // --- CALENDARIO ---
+        // --- AGENDA / CALENDARIO ---
         function renderCalendar(c) {
             const date = new Date(); const m = date.getMonth(); const y = 2026;
             const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -189,60 +198,6 @@
             });
             c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Agenda Escolar</h2>
                 ${alerts.length > 0 ? `<div class="mb-6 space-y-2">${alerts.map(a => `<div class="bg-blue-600 text-white p-4 rounded-2xl shadow-lg flex items-center gap-4 animate-pulse"><div class="bg-white/20 p-2 rounded-lg text-xs">🔔</div><div class="flex-1"><p class="text-[8px] font-black uppercase opacity-70">Aviso (${a.days === 0 ? 'Hoy' : 'En ' + a.days + ' d.'})</p><p class="text-[11px] font-black uppercase italic leading-none">${a.text}</p></div></div>`).join('')}</div>` : ''}
-                <div class="card p-6 mb-6"><div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;" class="mb-4">${['D','L','M','M','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300 uppercase">${d}</div>`).join('')}</div><div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">${Array(firstDay).fill('').map(()=>`<div></div>`).join('')}${Array.from({length: daysInMonth}, (_, i) => { const dNum = i + 1; const dStr = `${y}-${String(m+1).padStart(2,'0')}-${String(dNum).padStart(2,'0')}`; const isToday = dStr === now.toISOString().split('T')[0]; const event = state.events[dStr]; return `<div onclick="openEventModal('${dStr}')" class="day-btn aspect-square rounded-xl flex flex-col items-center justify-center text-[12px] font-black cursor-pointer transition-all relative ${isToday ? 'bg-blue-600 text-white shadow-xl scale-105 z-10' : event ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-500'}">${dNum}${event ? '<div class="absolute bottom-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></div>' : ''}</div>`; }).join('')}</div></div><div class="space-y-3 pb-24"><h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Eventos</h3>${Object.entries(state.events).filter(([d]) => d.startsWith(`${y}-${String(m+1).padStart(2,'0')}`)).sort().map(([d, txt]) => `<div class="bg-white p-4 rounded-2xl border border-gray-100 flex items-start gap-4" onclick="openEventModal('${d}')"><div class="bg-blue-50 text-blue-600 w-10 h-10 rounded-xl flex flex-col items-center justify-center flex-shrink-0"><span class="text-[8px] font-black uppercase">${monthNames[m].substring(0,3)}</span><span class="text-[14px] font-black">${d.split('-')[2]}</span></div><div class="flex-1"><p class="text-[11px] font-black italic text-gray-800 uppercase leading-tight">${txt}</p><button onclick="event.stopPropagation(); deleteEvent('${d}')" class="text-[8px] font-black text-red-300 uppercase mt-2">Eliminar</button></div></div>`).join('')}</div>`;
-        }
-        function openEventModal(dateStr) { selectedEventDate = dateStr; document.getElementById('event-modal-date').innerText = `Día ${dateStr.split('-')[2]} de ${dateStr.split('-')[1]}`; document.getElementById('input-event-text').value = state.events[dateStr] || ""; document.getElementById('modal-event').style.display = 'flex'; }
-        function closeEventModal() { document.getElementById('modal-event').style.display = 'none'; }
-        function saveEvent() { const val = document.getElementById('input-event-text').value.trim(); if (val === "") delete state.events[selectedEventDate]; else state.events[selectedEventDate] = val; closeEventModal(); render(); }
-        function deleteEvent(dateStr) { if(confirm("¿Eliminar?")) { delete state.events[dateStr]; render(); } }
-
-        // --- NUEVA SECCIÓN DE NOTAS v23 ---
-        function renderNotes(c) {
-            c.innerHTML = `
-                <h2 class="text-xl font-black italic mb-4 uppercase tracking-tighter">Bloc de Notas</h2>
-                <div class="card p-6 mb-6">
-                    <textarea id="new-note-text" class="w-full bg-gray-50 rounded-xl p-4 text-xs font-bold outline-none h-32 border border-gray-100 mb-4" placeholder="Escribe algo importante..."></textarea>
-                    <button onclick="addNote()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase shadow-lg shadow-blue-100">Guardar Nota</button>
-                </div>
-                <div class="space-y-3 pb-32">
-                    ${(state.notes || []).slice().reverse().map((n, i) => `
-                        <div class="bg-white p-5 rounded-2xl border border-gray-100 relative group">
-                            <div class="flex justify-between items-start mb-2">
-                                <span class="text-[8px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-2 py-1 rounded-md">${n.timestamp}</span>
-                                <button onclick="deleteNote(${state.notes.length - 1 - i})" class="text-red-200 hover:text-red-500 font-black text-xs">×</button>
-                            </div>
-                            <p class="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-wrap">${n.text}</p>
-                        </div>
-                    `).join('') || '<p class="text-[10px] text-gray-300 italic text-center py-10">No hay notas guardadas.</p>'}
-                </div>
-            `;
-        }
-
-        function addNote() {
-            const text = document.getElementById('new-note-text').value.trim();
-            if (!text) return;
-            const now = new Date();
-            const timestamp = now.toLocaleDateString('es-AR') + ' ' + now.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-            if(!state.notes) state.notes = [];
-            state.notes.push({ text, timestamp });
-            document.getElementById('new-note-text').value = '';
-            render();
-        }
-
-        function deleteNote(index) {
-            if(confirm("¿Eliminar esta nota?")) {
-                state.notes.splice(index, 1);
-                render();
-            }
-        }
-
-        window.onload = () => {
-            const d = new Date();
-            document.getElementById('header-date').innerText = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' }).toUpperCase();
-            render();
-        };
-    </script>
-</body>
-</html>
+                <div class="card p-6 mb-6"><div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;" class="mb-4">${['D','L','M','M','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300 uppercase">${d}</div>`).join('')}</div><div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;">${Array(firstDay).fill('').map(()=>`<div></div>`).join('')}${Array.from({length: daysInMonth}, (_, i) => { const dNum = i + 1; const dStr = `${y}-${String(m+1).padStart(2,'0')}-${String(dNum).padStart(2,'0')}`; const isToday = dStr === now.toISOString().split('T')[0]; const event = state.events[dStr]; return `<div onclick="openEventModal('${dStr}')" class="day-btn aspect-square rounded-xl flex flex-col items-center justify-center text-[12px] font-black cursor-pointer transition-all relative ${isToday ? 'bg-blue-600 text-white shadow-xl scale-105 z-10' : event ? 'bg-blue-100 text-blue-700 border
 
 ```
