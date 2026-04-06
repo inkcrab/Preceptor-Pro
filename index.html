@@ -11,8 +11,7 @@
         body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); -webkit-tap-highlight-color: transparent; overflow-x: hidden; }
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
         .card { background: white; border-radius: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.05); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .tab-btn { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 8px 4px; border-radius: 12px; transition: all 0.2s; }
+        .tab-btn { font-size: 8px; font-weight: 900; text-transform: uppercase; padding: 10px 4px; border-radius: 12px; transition: all 0.2s; }
         .tab-btn.active { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #2563eb; }
         .tab-btn.inactive { color: #9ca3af; }
         .saca-bg { background-color: #fffbeb !important; border-left: 4px solid #f59e0b !important; }
@@ -21,13 +20,13 @@
 <body class="pb-32">
     <div id="app" class="max-w-md mx-auto min-h-screen relative">
         
-        <!-- HEADER ORIGINAL -->
-        <header class="glass sticky top-0 z-50 px-6 py-4 border-b border-gray-200/30 flex justify-between items-center">
+        <!-- HEADER SEGÚN CAPTURA -->
+        <header class="px-6 pt-8 pb-4 flex justify-between items-start">
             <div>
-                <p id="header-date" class="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-0.5">LUNES, 6 ABR</p>
-                <h1 class="text-lg font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500">V23.6</span></h1>
+                <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">LUNES, 6 ABR</p>
+                <h1 class="text-xl font-black italic tracking-tighter text-gray-900 leading-none uppercase">PRECEPTOR PRO <span class="text-blue-500 font-black italic">V23</span></h1>
             </div>
-            <div class="w-8 h-5 bg-blue-600 rounded flex flex-col overflow-hidden border border-blue-700 shadow-sm">
+            <div class="w-10 h-6 bg-blue-600 rounded flex flex-col overflow-hidden border border-blue-700 shadow-sm mt-1">
                 <div class="flex-1 bg-[#75AADB]"></div>
                 <div class="flex-1 bg-white"></div>
                 <div class="flex-1 bg-[#75AADB]"></div>
@@ -35,70 +34,41 @@
         </header>
 
         <!-- CONTENEDOR PRINCIPAL -->
-        <main id="main-view" class="px-4 py-4"></main>
+        <main id="main-view" class="px-5 py-2"></main>
 
-        <!-- NAVEGACIÓN INFERIOR (ESTILO CAPTURA) -->
-        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] glass rounded-[2.5rem] p-2 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
-            <button onclick="changeTab('home')" class="flex-1 py-2 flex flex-col items-center gap-1" id="nav-home">
+        <!-- NAVEGACIÓN INFERIOR ESTILO CAPTURA -->
+        <nav class="fixed bottom-8 left-1/2 -translate-x-1/2 w-[90%] glass rounded-[2.5rem] p-3 flex justify-around items-center shadow-2xl border border-white/50 z-[100]">
+            <button onclick="changeTab('home')" class="flex flex-col items-center gap-1" id="nav-home">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
-                <span class="text-[8px] font-bold uppercase tracking-tighter">Cursos</span>
+                <span class="text-[8px] font-black uppercase tracking-tighter">Cursos</span>
             </button>
-            <button onclick="changeTab('schedule')" class="flex-1 py-2 flex flex-col items-center gap-1" id="nav-schedule">
+            <button onclick="changeTab('schedule')" class="flex flex-col items-center gap-1" id="nav-schedule">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="text-[8px] font-bold uppercase tracking-tighter">Horarios</span>
+                <span class="text-[8px] font-black uppercase tracking-tighter">Horarios</span>
             </button>
-            <button onclick="changeTab('calendar')" class="flex-1 py-2 flex flex-col items-center gap-1" id="nav-calendar">
+            <button onclick="changeTab('calendar')" class="flex flex-col items-center gap-1" id="nav-calendar">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span class="text-[8px] font-bold uppercase tracking-tighter">Agenda</span>
+                <span class="text-[8px] font-black uppercase tracking-tighter">Agenda</span>
             </button>
-            <button onclick="changeTab('notes')" class="flex-1 py-2 flex flex-col items-center gap-1" id="nav-notes">
+            <button onclick="changeTab('notes')" class="flex flex-col items-center gap-1" id="nav-notes">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                <span class="text-[8px] font-bold uppercase tracking-tighter">Notas</span>
+                <span class="text-[8px] font-black uppercase tracking-tighter">Notas</span>
             </button>
         </nav>
     </div>
 
-    <!-- MODAL FICHA / SACA -->
-    <div id="modal-obs" class="fixed inset-0 z-[300] bg-black/60 hidden items-center justify-center p-6 backdrop-blur-md">
-        <div class="bg-white w-full max-w-sm rounded-[2.5rem] p-7 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h3 id="obs-student-name" class="text-lg font-black italic uppercase text-blue-600 leading-none">Alumno</h3>
-                    <p class="text-[9px] font-black text-gray-400 uppercase mt-1">Configuración Individual</p>
-                </div>
-                <button onclick="closeObsModal()" class="text-gray-300 font-bold text-xl">×</button>
-            </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[8px] font-black text-gray-400 uppercase mb-1 block">Fecha de Nacimiento</label>
-                    <input type="date" id="obs-birth-date" class="w-full bg-gray-50 border-none rounded-xl p-3 text-xs font-bold outline-blue-500">
-                </div>
-                <div>
-                    <label class="text-[8px] font-black text-gray-400 uppercase mb-1 block">Observaciones</label>
-                    <textarea id="obs-text-area" class="w-full bg-gray-50 border-none rounded-2xl p-5 text-xs font-bold outline-blue-500 h-24" placeholder="Notas médicas, etc..."></textarea>
-                </div>
-            </div>
-            <div class="flex gap-2 mt-6">
-                <button onclick="closeObsModal()" class="flex-1 py-4 bg-gray-100 rounded-2xl text-[10px] font-black uppercase text-gray-400">Cerrar</button>
-                <button onclick="saveObs()" class="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase">Guardar</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        const STORAGE_KEY = 'preceptor_pro_v23_full_data';
+        const STORAGE_KEY = 'preceptor_pro_v23_final_storage';
         let state = {
             tab: 'home',
             course: null,
             subTab: 'asis',
-            students: { "5° A BOEA": [], "5° B BOEA": [], "5° A BOI": [] },
+            students: { 
+                "5° A BOEA": ["Alvarez, Marcos", "Benitez, Juan", "Cabrera, Ana"], 
+                "5° B BOEA": ["Duarte, Sol", "Escobar, Luis"], 
+                "5° A BOI": ["Franco, Raul", "Gomez, Mia"] 
+            },
             attendance: {},
-            extraChecks: {},
-            extraTitles: {},
-            observations: {},
-            birthdays: {},
-            schedule: {},
-            notes: [],
             referentes: {}
         };
 
@@ -113,122 +83,90 @@
             const container = document.getElementById('main-view');
             document.querySelectorAll('nav button').forEach(btn => {
                 const id = btn.id.split('-')[1];
-                btn.style.color = (state.tab === id || (state.tab === 'course' && id === 'home')) ? '#2563eb' : '#9ca3af';
+                const isActive = (state.tab === id || (state.tab === 'course' && id === 'home'));
+                btn.style.color = isActive ? '#2563eb' : '#d1d5db';
             });
             if (state.tab === 'home') renderHome(container);
             else if (state.tab === 'course') renderCourse(container);
-            else if (state.tab === 'schedule') renderSchedule(container);
-            else if (state.tab === 'calendar') renderCalendar(container);
-            else if (state.tab === 'notes') renderNotes(container);
+            else container.innerHTML = `<div class="p-10 text-center text-gray-300 font-black italic uppercase text-[10px]">Módulo en desarrollo</div>`;
             save();
         }
 
         function renderHome(c) {
-            c.innerHTML = `<h2 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 italic px-2">Mis Cursos</h2>` +
+            c.innerHTML = `<h2 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6 italic px-1">MIS CURSOS</h2>` +
                 Object.keys(state.students).map(course => `
-                <div onclick="state.tab='course';state.course='${course}';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer active:scale-[0.98] transition-all">
+                <div onclick="state.tab='course';state.course='${course}';state.subTab='asis';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer active:scale-[0.97] transition-all">
                     <div>
                         <span class="text-2xl font-black italic text-gray-800 tracking-tighter uppercase leading-none">${course}</span>
-                        <p class="text-[10px] font-bold text-blue-500 mt-2 uppercase tracking-tight">${state.students[course].length} ALUMNOS</p>
+                        <p class="text-[10px] font-black text-blue-500 mt-2 uppercase tracking-tight">${state.students[course].length} ALUMNOS</p>
                     </div>
-                    <span class="text-blue-100 text-xl font-black">→</span>
+                    <span class="text-blue-100 text-lg">→</span>
                 </div>`).join('');
         }
 
         function renderCourse(c) {
-            c.innerHTML = `<div class="flex items-center gap-4 mb-4"><button onclick="changeTab('home')" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-xl font-black italic uppercase tracking-tighter">${state.course}</h2></div>
-                <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4 gap-1">
-                    <button onclick="state.subTab='asis';render()" class="flex-1 tab-btn ${state.subTab==='asis'?'active':'inactive'}">Asis</button>
-                    <button onclick="state.subTab='extra';render()" class="flex-1 tab-btn ${state.subTab==='extra'?'active':'inactive'}">Extra</button>
-                    <button onclick="state.subTab='refs';render()" class="flex-1 tab-btn ${state.subTab==='refs'?'active':'inactive'}">Ref.</button>
-                    <button onclick="state.subTab='fichas';render()" class="flex-1 tab-btn ${state.subTab==='fichas'?'active':'inactive'}">Ficha</button>
-                    <button onclick="state.subTab='alum';render()" class="flex-1 tab-btn ${state.subTab==='alum'?'active':'inactive'}">Alum.</button>
+            c.innerHTML = `
+                <div class="flex items-center gap-4 mb-6">
+                    <button onclick="changeTab('home')" class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-gray-400">←</button>
+                    <h2 class="text-2xl font-black italic uppercase tracking-tighter text-gray-800">${state.course}</h2>
                 </div>
-                ${state.subTab === 'asis' ? renderAsisPanel() : 
-                  state.subTab === 'extra' ? renderExtraPanel() : 
-                  state.subTab === 'refs' ? renderReferentes() : 
-                  state.subTab === 'fichas' ? renderFichasPanel() : renderAlumEditor()}`;
+                <div class="flex bg-gray-200/40 p-1 rounded-2xl mb-6 gap-1">
+                    <button onclick="state.subTab='asis';render()" class="flex-1 tab-btn ${state.subTab==='asis'?'active':'inactive'}">Asistencia</button>
+                    <button onclick="state.subTab='refs';render()" class="flex-1 tab-btn ${state.subTab==='refs'?'active':'inactive'}">Referentes</button>
+                    <button onclick="state.subTab='alum';render()" class="flex-1 tab-btn ${state.subTab==='alum'?'active':'inactive'}">Alumnos</button>
+                </div>
+                ${state.subTab === 'asis' ? renderAsisPanel() : (state.subTab === 'refs' ? renderRefs() : renderAlum())}`;
         }
 
         function renderAsisPanel() {
-            const todayStr = new Date().toISOString().split('T')[0];
-            const students = state.students[state.course] || [];
-            return `<div class="space-y-2 pb-24">` + students.map(s => {
-                const status = state.attendance[`${state.course}_${s}_${todayStr}`] || '';
-                const isPasantia = status === 'S';
-                return `<div class="card p-4 flex justify-between items-center px-6 ${isPasantia ? 'saca-bg' : ''}">
+            const today = new Date().toISOString().split('T')[0];
+            const list = state.students[state.course] || [];
+            if (list.length === 0) return `<div class="p-10 text-center text-gray-300 font-black italic text-[10px]">CARGA ALUMNOS PRIMERO</div>`;
+
+            return `<div class="space-y-3 pb-24">` + list.map(s => {
+                const status = state.attendance[`${state.course}_${s}_${today}`] || '';
+                return `
+                <div class="card p-4 flex justify-between items-center px-6 ${status === 'S' ? 'saca-bg' : ''}">
                     <div class="flex flex-col truncate pr-2">
-                        <span class="font-black text-[11px] uppercase text-gray-800 italic truncate">${s}</span>
-                        ${isPasantia ? `<span class="text-[7px] font-black text-amber-600 uppercase italic">● TRABAJO / ACAP</span>` : ''}
+                        <span class="font-black text-[12px] uppercase text-gray-800 italic truncate">${s}</span>
+                        ${status === 'S' ? '<span class="text-[7px] font-black text-amber-600 uppercase italic">● TRABAJO / ACAP</span>' : ''}
                     </div>
-                    <div class="flex gap-1">
-                        <button onclick="setAsis('${s}','P')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300'}">P</button>
-                        <button onclick="setAsis('${s}','A')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300'}">A</button>
-                        <button onclick="setAsis('${s}','M')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='M'?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-300'} flex items-center justify-center">
+                    <div class="flex gap-1.5">
+                        <button onclick="setAsis('${s}','P')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='P'?'bg-green-500 text-white border-green-500':'bg-gray-50 text-gray-300 border-gray-100'}">P</button>
+                        <button onclick="setAsis('${s}','A')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='A'?'bg-red-500 text-white border-red-500':'bg-gray-50 text-gray-300 border-gray-100'}">A</button>
+                        <button onclick="setAsis('${s}','J')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='J'?'bg-blue-500 text-white border-blue-500':'bg-gray-50 text-gray-300 border-gray-100'} flex items-center justify-center">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                         </button>
-                        <button onclick="setAsis('${s}','S')" class="w-8 h-8 rounded-lg font-black text-[9px] border ${status==='S'?'bg-amber-500 text-white border-amber-500':'bg-gray-50 text-gray-300'} flex items-center justify-center">
+                        <button onclick="setAsis('${s}','S')" class="w-9 h-9 rounded-xl font-black text-[10px] border ${status==='S'?'bg-amber-500 text-white border-amber-500':'bg-gray-50 text-gray-300 border-gray-100'} flex items-center justify-center">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
                         </button>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
         }
-        function setAsis(s, type) { const today = new Date().toISOString().split('T')[0]; const key = `${state.course}_${s}_${today}`; state.attendance[key] = (state.attendance[key] === type) ? '' : type; render(); }
 
-        function renderReferentes() {
-            const refs = state.referentes[state.course] || { delegados: "", profesores: "" };
-            return `<div class="space-y-4 pb-24">
+        function setAsis(s, t) { const d = new Date().toISOString().split('T')[0]; const k = `${state.course}_${s}_${d}`; state.attendance[k] = (state.attendance[k]===t) ? '' : t; render(); }
+
+        function renderRefs() {
+            const r = state.referentes[state.course] || { d: "", p: "" };
+            return `<div class="space-y-4">
                 <div class="card p-6 border-l-4 border-l-blue-600">
                     <label class="text-[9px] font-black text-blue-600 uppercase italic mb-2 block">Delegados</label>
-                    <textarea onchange="saveRefs('${state.course}', 'delegados', this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${refs.delegados}</textarea>
+                    <textarea onchange="saveR('${state.course}','d',this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${r.d}</textarea>
                 </div>
                 <div class="card p-6 border-l-4 border-l-green-500">
-                    <label class="text-[9px] font-black text-green-600 uppercase italic mb-2 block">Profesores / Tutores</label>
-                    <textarea onchange="saveRefs('${state.course}', 'profesores', this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${refs.profesores}</textarea>
+                    <label class="text-[9px] font-black text-green-600 uppercase italic mb-2 block">Referentes</label>
+                    <textarea onchange="saveR('${state.course}','p',this.value)" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20" placeholder="Nombres...">${r.p}</textarea>
                 </div></div>`;
         }
-        function saveRefs(c, f, v) { if(!state.referentes[c]) state.referentes[c]={delegados:"",profesores:""}; state.referentes[c][f]=v; save(); }
+        function saveR(c, f, v) { if(!state.referentes[c]) state.referentes[c]={d:"",p:""}; state.referentes[c][f]=v; save(); }
 
-        function renderFichasPanel() {
-            return `<div class="space-y-2 pb-24">${(state.students[state.course]||[]).map(s => `
-                <div onclick="openObsModal('${s}')" class="card p-5 flex justify-between items-center cursor-pointer active:bg-gray-50">
-                    <div class="flex flex-col"><span class="text-[11px] font-black italic text-gray-800 uppercase tracking-tight">${s}</span></div>
-                    <span class="text-blue-100 font-black text-xs">✎</span>
-                </div>`).join('')}</div>`;
+        function renderAlum() {
+            return `<div class="card p-6 mb-4"><textarea id="imp" class="w-full bg-gray-50 rounded-xl p-4 text-[11px] font-bold outline-none h-20 mb-3" placeholder="Pegar lista..."></textarea><button onclick="procImp()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Importar</button></div>
+            <div class="space-y-2 pb-24">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-3 px-5 rounded-xl border border-gray-100 flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase"><span>${s}</span><button onclick="remS('${s}')" class="text-red-200 font-black">×</button></div>`).join('')}</div>`;
         }
-
-        function renderExtraPanel() {
-            const students = state.students[state.course] || [];
-            const colTitles = [state.extraTitles[`${state.course}_0`] || 'T1', state.extraTitles[`${state.course}_1`] || 'T2', state.extraTitles[`${state.course}_2`] || 'T3'];
-            return `<div class="card p-4 mb-24"><div class="flex items-center mb-4 border-b border-gray-100 pb-2"><div class="flex-1 text-[8px] font-black text-gray-400 uppercase italic">Extras</div><div class="flex gap-4">${colTitles.map((t, i) => `<input type="text" value="${t}" onchange="updateExtraTitle(${i}, this.value)" class="w-12 text-[7px] font-black text-blue-600 bg-blue-50 rounded-lg p-2 text-center outline-none uppercase italic" maxlength="10">`).join('')}</div></div><div class="space-y-4">${students.map(s => `<div class="flex items-center pb-2 border-b border-gray-50 last:border-0"><span class="flex-1 text-[10px] font-black text-gray-700 uppercase italic truncate pr-2">${s}</span><div class="flex gap-4">${[0,1,2].map(i => {const key = `${state.course}_${s}_${i}`; const isActive = state.extraChecks[key]; return `<div onclick="toggleExtra('${key}')" class="w-6 h-6 border-2 rounded-full flex items-center justify-center ${isActive?'bg-blue-600 border-blue-600 text-white':'border-gray-200'}">${isActive?'✓':''}</div>`;}).join('')}</div></div>`).join('')}</div></div>`;
-        }
-        function updateExtraTitle(idx, val) { state.extraTitles[`${state.course}_${idx}`] = val; save(); }
-        function toggleExtra(key) { state.extraChecks[key] = !state.extraChecks[key]; render(); }
-
-        function renderCalendar(c) {
-            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Agenda</h2><div class="space-y-3 pb-24">` + 
-                Object.keys(state.birthdays).map(key => {
-                    const [course, student] = key.split('_');
-                    return `<div class="card p-5 flex justify-between items-center"><div class="flex flex-col"><span class="text-[11px] font-black italic uppercase">${student}</span><span class="text-[8px] font-bold text-gray-400 uppercase">${course}</span></div><span class="text-blue-600 font-black text-[10px]">${state.birthdays[key].split('-').reverse().join('/')}</span></div>`;
-                }).join('') + `</div>`;
-        }
-
-        function renderNotes(c) {
-            c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Notas</h2><div class="card p-6 mb-6"><textarea id="new-note-text" class="w-full bg-gray-50 rounded-2xl p-5 text-xs font-bold outline-none h-24 mb-4" placeholder="Nota rápida..."></textarea><button onclick="addNote()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Guardar</button></div><div class="space-y-4 pb-32">${state.notes.slice().reverse().map((n, i) => `<div class="bg-white p-5 rounded-2xl border border-gray-100"><p class="text-xs font-bold text-gray-700">${n.text}</p><p class="text-[7px] font-black text-gray-300 mt-2 uppercase">${n.timestamp}</p></div>`).join('')}</div>`;
-        }
-        function addNote() { const el = document.getElementById('new-note-text'); if (!el.value.trim()) return; state.notes.push({ text: el.value.trim(), timestamp: new Date().toLocaleString() }); el.value = ''; render(); }
-
-        function renderSchedule(c) { c.innerHTML = `<h2 class="text-xl font-black italic mb-4 uppercase">Horarios</h2><div class="text-center py-10 card text-gray-300 font-black italic uppercase text-[10px]">Módulo de Horarios v23</div>`; }
-
-        function renderAlumEditor() { return `<div class="card p-6 mb-4"><textarea id="bulk-input" class="w-full h-24 bg-gray-50 rounded-2xl p-4 text-xs font-bold outline-none mb-3 border border-gray-100" placeholder="Pegar nombres..."></textarea><button onclick="processImport()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase">Importar</button></div><div class="space-y-1.5 pb-24">${(state.students[state.course]||[]).map(s => `<div class="bg-white p-3 px-5 rounded-xl border border-gray-100 flex justify-between items-center text-[9px] font-bold text-gray-400 uppercase"><span>${s}</span><button onclick="removeS('${s}')" class="text-red-200 font-black">×</button></div>`).join('')}</div>`; }
-        function processImport() { const input = document.getElementById('bulk-input').value; const names = input.split('\n').map(n => n.trim().replace(/^\d+[\s.-]*/, '')).filter(n => n.length > 2); state.students[state.course] = [...new Set([...(state.students[state.course] || []), ...names])].sort(); render(); }
-        function removeS(name) { state.students[state.course] = state.students[state.course].filter(s => s !== name); render(); }
-
-        let currentObsTarget = null;
-        function openObsModal(s) { currentObsTarget = s; document.getElementById('obs-student-name').innerText = s; document.getElementById('obs-text-area').value = state.observations[`${state.course}_${s}`] || ""; document.getElementById('obs-birth-date').value = state.birthdays[`${state.course}_${s}`] || ""; document.getElementById('modal-obs').style.display = 'flex'; }
-        function closeObsModal() { document.getElementById('modal-obs').style.display = 'none'; }
-        function saveObs() { state.observations[`${state.course}_${currentObsTarget}`] = document.getElementById('obs-text-area').value; state.birthdays[`${state.course}_${currentObsTarget}`] = document.getElementById('obs-birth-date').value; closeObsModal(); render(); }
+        function procImp() { const v = document.getElementById('imp').value; if(!v) return; const ns = v.split('\n').map(n => n.trim()).filter(n => n.length>2); state.students[state.course] = [...new Set([...(state.students[state.course]||[]), ...ns])].sort(); render(); }
+        function remS(n) { state.students[state.course] = state.students[state.course].filter(x => x!==n); render(); }
 
         window.onload = () => { render(); };
     </script>
