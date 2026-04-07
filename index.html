@@ -2,7 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <!-- Se mantiene el escalado para permitir zoom con los dedos -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Preceptor Pro v26.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -27,7 +28,6 @@
         .schedule-grid { display: grid; grid-template-columns: 110px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
         .schedule-cell { background: white; padding: 8px; text-align: center; font-size: 10px; min-height: 65px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
 
-        /* Estilo para que el nombre ocupe el espacio necesario */
         .student-name-full { font-weight: 900; font-size: 11px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 10px; line-height: 1.2; }
     </style>
 </head>
@@ -76,7 +76,7 @@
             sub: 'asis',
             asisMode: 'day',
             sort: 'abc',
-            date: new Date(2026, 3, 6),
+            date: new Date(),
             students: {
                 "5° A BOEA": ["01 ALVAREZ", "02 BENITEZ", "10 CESPEDES"],
                 "5° B BOEA": ["01 GOMEZ", "02 LOPEZ", "10 ZARATE"],
@@ -122,7 +122,6 @@
             const today = new Date();
             document.getElementById('top-date').innerText = today.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'}).toUpperCase();
 
-            // Alertas
             const alerts = [];
             for(let i=0; i<=3; i++){
                 const check = new Date(today); check.setDate(today.getDate()+i);
@@ -204,8 +203,8 @@
                         const val = dia[s] || '';
                         return `<div class="card p-4 flex justify-between items-center px-4 ${val==='ACAP'?'bg-amber-50 border-l-8 border-amber-400':''}">
                             <div class="student-name-full">${s}</div>
-                            <div class="flex gap-1">
-                                ${['P','A','J','ACAP'].map(o => `<button onclick="toggleAsis('${s}','${o}')" class="px-2 h-9 rounded-lg font-black text-[9px] border ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">${o==='ACAP'?'💼 ACAP':getIco(o)}</button>`).join('')}
+                            <div class="flex gap-1 overflow-x-auto no-scrollbar">
+                                ${['P','A','J','S','ACAP'].map(o => `<button onclick="toggleAsis('${s}','${o}')" class="px-2 h-9 rounded-lg font-black text-[9px] border min-w-[32px] ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">${o==='ACAP'?'💼 ACAP':getIco(o)}</button>`).join('')}
                             </div>
                         </div>`;
                     }).join('') + `</div>`;
@@ -218,7 +217,7 @@
                         <thead class="bg-gray-50 uppercase text-[8px]"><tr><th class="sticky-col">Alumno</th>${week.map(d => `<th>${d.split('/')[0]}/${d.split('/')[1]}</th>`).join('')}</tr></thead>
                         <tbody class="uppercase font-bold text-[9px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${week.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':''}"><b>${v==='ACAP'?'ACAP':v}</b></td>`;
+                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''}"><b>${v==='ACAP'?'ACAP':v}</b></td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
                 }
@@ -231,7 +230,7 @@
                         <thead class="bg-gray-100 uppercase text-[7px] font-black"><tr><th class="sticky-col">Alumno</th>${dates.map(d => `<th>${d.split('/')[0]}</th>`).join('')}</tr></thead>
                         <tbody class="uppercase font-bold text-[8px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${dates.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            const color = v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='ACAP'?'bg-amber-100 text-amber-700':'';
+                            const color = v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='S'?'bg-orange-50 text-orange-500':v==='ACAP'?'bg-amber-100 text-amber-700':'';
                             return `<td class="${color}">${v==='ACAP'?'ACAP':v}</td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
@@ -272,11 +271,12 @@
         }
 
         function jumpDate(v) { if(v) { db.date = new Date(v + "T12:00:00"); render(); } }
-        function getIco(v) { if(v==='J') return '🩺 J'; return v; }
+        function getIco(v) { if(v==='J') return '🩺 J'; if(v==='S') return '🚫 S'; return v; }
         function getCol(v) {
             if(v==='P') return 'bg-green-500 border-green-500 text-white';
             if(v==='A') return 'bg-red-500 border-red-500 text-white';
             if(v==='J') return 'bg-blue-500 border-blue-500 text-white';
+            if(v==='S') return 'bg-orange-500 border-orange-500 text-white';
             if(v==='ACAP') return 'bg-amber-500 border-amber-500 text-white';
         }
         function toggleAsis(s, v) {
@@ -370,7 +370,7 @@
 
         function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
         function toggleCk(s, i) { const k = `${db.course}_${s}`; if(!db.checklists[k]) db.checklists[k]=[false,false,false]; db.checklists[k][i] = !db.checklists[k][i]; save(); }
-        function saveAc(s, f, v) { const dk = db.date.toLocaleDateString(); if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; db.acap[dk][db.course][s][f] = v; save(); }
+        function saveAc(s, f, v) { const dk = db.date.toLocaleDateString(); if(!db.acap[dk]) db.acap[dk]={}; if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; db.acap[dk][db.course][s][f] = v; save(); }
 
         window.onload = () => { load(); render(); };
     </script>
