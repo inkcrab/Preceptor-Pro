@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v27.0 - Smart ACAP</title>
+    <title>Preceptor Pro v27.1 - Fecha Corregida</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -31,7 +31,6 @@
         
         .asis-btn { height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
         
-        /* Estilo para resaltar ACAP en la lista */
         .acap-highlight { background-color: #fffbeb !important; border: 2px solid #fbbf24 !important; border-left-width: 12px !important; transform: scale(1.02); z-index: 5; }
         .acap-badge { background: #fbbf24; color: #78350f; font-size: 7px; font-weight: 900; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; margin-bottom: 2px; display: inline-block; }
     </style>
@@ -43,7 +42,7 @@
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
                 <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-white bg-green-600 px-2 py-1 rounded">V27.0 MASTER</div>
+            <div class="text-[9px] font-bold text-white bg-green-600 px-2 py-1 rounded">V27.1 MASTER</div>
         </header>
 
         <div id="alerts" class="px-6 mb-4 space-y-2"></div>
@@ -71,7 +70,7 @@
     </div>
 
     <script>
-        const KEY = 'prec_v26_master_omar'; // Mantenemos la key para no borrar datos previos
+        const KEY = 'prec_v26_master_omar';
         const HORARIOS = ["12:30 a 13:10", "13:10 a 13:50", "13:50 a 14:30", "14:40 a 15:20", "15:20 a 16:00", "16:00 a 16:40", "16:50 a 17:30", "17:30 a 18:10"];
         const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
@@ -100,12 +99,19 @@
         };
 
         function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+        
         function load() {
             const data = localStorage.getItem(KEY);
             if(data) {
                 const parsed = JSON.parse(data);
                 db = {...db, ...parsed};
-                db.date = new Date(db.date);
+                // CORRECCIÓN CRÍTICA: Al cargar, forzamos que la fecha sea la de HOY real
+                db.date = new Date(); 
+                // Aseguramos que la hora no interfiera con comparaciones de fechas
+                db.date.setHours(12, 0, 0, 0); 
+            } else {
+                db.date = new Date();
+                db.date.setHours(12, 0, 0, 0);
             }
         }
 
@@ -182,7 +188,6 @@
             const dateStr = db.date.toLocaleDateString();
 
             if(db.sub === 'asis') {
-                // Lógica de detección de ACAP para el día seleccionado
                 const studentsInAcapToday = list.filter(s => {
                     const acData = db.acap[dateStr]?.[db.course]?.[s];
                     return acData && (acData.h || acData.l);
@@ -227,7 +232,6 @@
 
                     return header + `<div class="space-y-2 pb-24">` + list.map(s => {
                         const val = dia[s] || '';
-                        // Verificamos si este alumno tiene info en ACAP para ESTE día
                         const acInfo = db.acap[dateStr]?.[db.course]?.[s];
                         const hasAcap = acInfo && (acInfo.h || acInfo.l);
                         
@@ -418,19 +422,15 @@
         function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
         function toggleCk(s, i) { const k = `${db.course}_${s}`; if(!db.checklists[k]) db.checklists[k]=[false,false,false]; db.checklists[k][i] = !db.checklists[k][i]; save(); }
         
-        // Función de guardado de ACAP mejorada
         function saveAc(s, f, v) { 
             const dk = db.date.toLocaleDateString(); 
             if(!db.acap[dk]) db.acap[dk]={}; 
             if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; 
             if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; 
             db.acap[dk][db.course][s][f] = v; 
-            
-            // Si el campo se vacía por completo, podemos borrarlo para ahorrar espacio
             if(!db.acap[dk][db.course][s].h && !db.acap[dk][db.course][s].l) {
                 delete db.acap[dk][db.course][s];
             }
-            
             save(); 
         }
 
