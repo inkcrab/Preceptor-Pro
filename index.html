@@ -2,33 +2,38 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <!-- Se mantiene el escalado para permitir zoom con los dedos -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v26.1</title>
+    <title>Preceptor Pro v26.2</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --ios-bg: #f2f2f7; --accent: #2563eb; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); color: #1c1c1e; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); color: #1c1c1e; -webkit-font-smoothing: antialiased; }
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
         .card { background: white; border-radius: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.05); }
         
+        /* Colores por curso */
         .bg-5a-boea { background-color: #f3f0ff !important; border-left: 8px solid #a78bfa !important; }
         .bg-5b-boea { background-color: #fff1f2 !important; border-left: 8px solid #9f1239 !important; }
         .bg-5a-boi { background-color: #f0f9ff !important; border-left: 8px solid #0ea5e9 !important; }
         
-        .tab-btn { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 8px; border-radius: 10px; flex: 1; text-align: center; transition: 0.2s; }
+        /* Botones de navegación interna */
+        .tab-btn { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 6px; border-radius: 10px; flex: 1; text-align: center; transition: 0.2s; }
         .tab-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
         
+        /* Tablas */
         .monthly-scroll-container { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; border-radius: 12px; background: white; }
         .monthly-table { border-collapse: collapse; width: 100%; font-size: 11px; }
         .monthly-table th, .monthly-table td { border: 1px solid #f0f0f0; padding: 8px 4px; text-align: center; min-width: 38px; }
-        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; min-width: 140px !important; text-align: left !important; padding-left: 10px !important; font-weight: 700; box-shadow: 2px 0 5px rgba(0,0,0,0.05); white-space: normal; word-break: break-word; }
+        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; min-width: 130px !important; text-align: left !important; padding-left: 10px !important; font-weight: 700; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
 
-        .schedule-grid { display: grid; grid-template-columns: 110px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
-        .schedule-cell { background: white; padding: 8px; text-align: center; font-size: 10px; min-height: 65px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
+        .schedule-grid { display: grid; grid-template-columns: 100px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
+        .schedule-cell { background: white; padding: 6px; text-align: center; font-size: 10px; min-height: 60px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
 
-        .student-name-full { font-weight: 900; font-size: 11px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 5px; line-height: 1.1; }
+        .student-name-full { font-weight: 900; font-size: 10.5px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 4px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+        
+        /* Estilo específico para botones de asistencia para que no se corten */
+        .asis-btn { px-1; height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
     </style>
 </head>
 <body class="pb-32">
@@ -38,7 +43,7 @@
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
                 <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">V26.1 MASTER</div>
+            <div class="text-[9px] font-bold text-white bg-red-600 px-2 py-1 rounded animate-pulse">V26.2 ACTUALIZADO</div>
         </header>
 
         <div id="alerts" class="px-6 mb-4 space-y-2"></div>
@@ -142,7 +147,7 @@
         }
 
         function renderHome(c) {
-            c.innerHTML = `<p class="text-[10px] font-black text-gray-400 mb-6 uppercase tracking-widest italic">Seleccionar Curso</p>` +
+            c.innerHTML = `<p class="text-[10px] font-black text-gray-400 mb-6 uppercase tracking-widest italic">Cursos</p>` +
             Object.keys(db.students).map(cur => `
                 <div onclick="db.view='course';db.course='${cur}';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer ${getCourseStyle(cur)}">
                     <h2 class="text-2xl font-black italic uppercase tracking-tighter">${cur}</h2>
@@ -164,10 +169,10 @@
                     <h2 class="text-xl font-black italic uppercase">${db.course}</h2>
                 </div>
                 <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4 gap-1 overflow-x-auto no-scrollbar">
-                    <button onclick="db.sub='asis';render()" class="tab-btn ${db.sub==='asis'?'active':'inactive'}">Asis</button>
+                    <button onclick="db.sub='asis';render()" class="tab-btn ${db.sub==='asis'?'active':'inactive'}">Asistencia</button>
                     <button onclick="db.sub='acap';render()" class="tab-btn ${db.sub==='acap'?'active':'inactive'}">ACAP</button>
                     <button onclick="db.sub='list';render()" class="tab-btn ${db.sub==='list'?'active':'inactive'}">Listas</button>
-                    <button onclick="db.sub='edit';render()" class="tab-btn ${db.sub==='edit'?'active':'inactive'}">Alumnos</button>
+                    <button onclick="db.sub='edit';render()" class="tab-btn ${db.sub==='edit'?'active':'inactive'}">Editar</button>
                 </div>
                 <div>${renderCourseDetail()}</div>`;
         }
@@ -183,14 +188,14 @@
                     <button onclick="db.asisMode='week';render()" class="tab-btn ${db.asisMode==='week'?'bg-blue-600 text-white':'text-gray-400'}">Semana</button>
                     <button onclick="db.asisMode='month';render()" class="tab-btn ${db.asisMode==='month'?'bg-blue-600 text-white':'text-gray-400'}">Mes</button>
                 </div>
-                <div class="flex justify-between items-center mb-4 px-2">
-                    <div class="flex gap-3">
+                <div class="flex justify-between items-center mb-4 px-1">
+                    <div class="flex gap-2">
                         <button onclick="db.sort='abc';render()" class="text-[8px] font-black uppercase ${db.sort==='abc'?'text-blue-600 underline':'text-gray-300'}">ABC</button>
-                        <button onclick="db.sort='faltas';render()" class="text-[8px] font-black uppercase ${db.sort==='faltas'?'text-blue-600 underline':'text-gray-300'}">Faltas</button>
+                        <button onclick="db.sort='faltas';render()" class="text-[8px] font-black uppercase ${db.sort==='faltas'?'text-blue-600 underline':'text-gray-300'}">FALTAS</button>
                     </div>
                     <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg shadow-sm border">
                         <button onclick="moveD(-1)" class="text-blue-600 text-xl font-bold px-1">‹</button>
-                        <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="text-[10px] font-black uppercase text-blue-600 border-none bg-transparent">
+                        <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="text-[10px] font-black uppercase text-blue-600 border-none bg-transparent w-24">
                         <button onclick="moveD(1)" class="text-blue-600 text-xl font-bold px-1">›</button>
                     </div>
                 </div>`;
@@ -199,12 +204,15 @@
                     if(!db.attendance[dateStr]) db.attendance[dateStr] = {};
                     if(!db.attendance[dateStr][db.course]) db.attendance[dateStr][db.course] = {};
                     const dia = db.attendance[dateStr][db.course];
-                    return header + `<div class="space-y-3 pb-24">` + list.map(s => {
+                    return header + `<div class="space-y-2 pb-24">` + list.map(s => {
                         const val = dia[s] || '';
-                        return `<div class="card p-4 flex justify-between items-center px-3 ${val==='ACAP'?'bg-amber-50 border-l-8 border-amber-400':''}">
+                        return `<div class="card p-3 flex justify-between items-center gap-2 ${val==='ACAP'?'bg-amber-50 border-l-4 border-amber-400':''}">
                             <div class="student-name-full">${s}</div>
-                            <div class="flex gap-1">
-                                ${['P','A','J','S','ACAP'].map(o => `<button onclick="toggleAsis('${s}','${o}')" class="px-1.5 h-8 rounded-lg font-black text-[9px] border min-w-[28px] ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">${o==='ACAP'?'💼':getIco(o)}</button>`).join('')}
+                            <div class="flex gap-1 shrink-0">
+                                ${['P','A','J','S','ACAP'].map(o => `
+                                    <button onclick="toggleAsis('${s}','${o}')" class="asis-btn ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">
+                                        ${o==='ACAP'?'💼':o}
+                                    </button>`).join('')}
                             </div>
                         </div>`;
                     }).join('') + `</div>`;
@@ -217,7 +225,7 @@
                         <thead class="bg-gray-50 uppercase text-[8px]"><tr><th class="sticky-col">Alumno</th>${week.map(d => `<th>${d.split('/')[0]}/${d.split('/')[1]}</th>`).join('')}</tr></thead>
                         <tbody class="uppercase font-bold text-[9px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${week.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''}"><b>${v==='ACAP'?'ACAP':v}</b></td>`;
+                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''}"><b>${v}</b></td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
                 }
@@ -231,7 +239,7 @@
                         <tbody class="uppercase font-bold text-[8px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${dates.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
                             const color = v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='S'?'bg-orange-50 text-orange-500':v==='ACAP'?'bg-amber-100 text-amber-700':'';
-                            return `<td class="${color}">${v==='ACAP'?'ACAP':v}</td>`;
+                            return `<td class="${color}">${v}</td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
                 }
@@ -257,7 +265,7 @@
                 return `<div class="card p-3 mb-4 flex gap-2">${db.checklistLabels.map((l,i) => `<input onchange="db.checklistLabels[${i}]=this.value;save()" class="flex-1 bg-gray-100 p-2 text-[8px] font-black uppercase text-center rounded-lg border-none" value="${l}">`).join('')}</div>
                 <div class="space-y-2 pb-24">` + list.map(s => {
                     const ck = db.checklists[`${db.course}_${s}`] || [false, false, false];
-                    return `<div class="card p-4 flex justify-between items-center px-6"><span class="student-name-full" style="font-size:10px">${s}</span><div class="flex gap-6">${ck.map((v, i) => `<input type="checkbox" ${v?'checked':''} onchange="toggleCk('${s}',${i})">`).join('')}</div></div>`;
+                    return `<div class="card p-4 flex justify-between items-center px-6"><span class="student-name-full" style="font-size:10px">${s}</span><div class="flex gap-6">${ck.map((v, i) => `<input type="checkbox" ${v?'checked':''} onchange="toggleCk('${s}',${i})" class="w-5 h-5">`).join('')}</div></div>`;
                 }).join('') + `</div>`;
             }
 
@@ -271,16 +279,11 @@
         }
 
         function jumpDate(v) { if(v) { db.date = new Date(v + "T12:00:00"); render(); } }
-        function getIco(v) { 
-            if(v==='J') return '🩺'; 
-            if(v==='S') return '🚫'; 
-            return v; 
-        }
         function getCol(v) {
             if(v==='P') return 'bg-green-500 border-green-500 text-white';
             if(v==='A') return 'bg-red-500 border-red-500 text-white';
             if(v==='J') return 'bg-blue-500 border-blue-500 text-white';
-            if(v==='S') return 'bg-orange-500 border-orange-500 text-white';
+            if(v==='S') return 'bg-orange-600 border-orange-600 text-white';
             if(v==='ACAP') return 'bg-amber-500 border-amber-500 text-white';
         }
         function toggleAsis(s, v) {
@@ -300,15 +303,15 @@
             }
             c.innerHTML = `
                 <div class="flex items-center gap-4 mb-4"><button onclick="db.course=null;render()" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-lg font-black italic uppercase">${db.course}</h2></div>
-                <div class="card p-1 overflow-x-auto"><div class="schedule-grid" style="min-width:650px">
+                <div class="card p-1 overflow-x-auto"><div class="schedule-grid" style="min-width:600px">
                     <div class="schedule-cell font-black bg-gray-50 text-[8px]">HORA</div>${DIAS.map(d => `<div class="schedule-cell font-black bg-gray-50 text-[8px]">${d}</div>`).join('')}
                     ${HORARIOS.map((h, i) => `
                         <div class="schedule-cell font-black bg-gray-50 text-[8px]">${h}</div>
                         ${DIAS.map(d => {
                             const k = `${db.course}_${d}_${i}`; const val = db.schedule[k] || {m:'',p:''};
                             return `<div class="schedule-cell">
-                                <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-blue-600 text-[9px] bg-transparent border-none p-0" placeholder="Materia" value="${val.m}">
-                                <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 text-[7px] bg-transparent border-none p-0 uppercase" placeholder="Profesor" value="${val.p}">
+                                <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-blue-600 text-[9px] bg-transparent border-none p-0" placeholder="..." value="${val.m}">
+                                <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 text-[7px] bg-transparent border-none p-0 uppercase" placeholder="..." value="${val.p}">
                             </div>`;
                         }).join('')}
                     `).join('')}
@@ -316,8 +319,8 @@
                     ${DIAS.map(d => {
                         const k = `${db.course}_${d}_CT`; const val = db.schedule[k] || {m:'',p:''};
                         return `<div class="schedule-cell bg-orange-50">
-                            <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-orange-600 text-[9px] bg-transparent border-none p-0" placeholder="Mat." value="${val.m}">
-                            <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-orange-500 text-[7px] bg-transparent border-none p-0 uppercase" placeholder="Prof." value="${val.p}">
+                            <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-orange-600 text-[9px] bg-transparent border-none p-0" placeholder="..." value="${val.m}">
+                            <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-orange-500 text-[7px] bg-transparent border-none p-0 uppercase" placeholder="..." value="${val.p}">
                         </div>`;
                     }).join('')}
                 </div></div>`;
@@ -354,10 +357,10 @@
 
         let tN;
         function renderNotes(c) {
-            c.innerHTML = `<h2 class="text-xl font-black italic uppercase mb-6 px-2">Bloc de Notas</h2>
+            c.innerHTML = `<h2 class="text-xl font-black italic uppercase mb-6 px-2">Notas</h2>
             <div class="card p-6 mb-6">
-                <textarea id="nin" oninput="aS(this.value)" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-2" placeholder="Escribe aquí..."></textarea>
-                <div id="sms" class="text-[8px] font-black text-green-500 uppercase italic opacity-0">Guardado automáticamente ✓</div>
+                <textarea id="nin" oninput="aS(this.value)" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-2" placeholder="Escribe algo importante..."></textarea>
+                <div id="sms" class="text-[8px] font-black text-green-500 uppercase italic opacity-0 text-right">Guardado ✓</div>
             </div>
             <div class="space-y-4 pb-24 px-2">${db.notes.slice().reverse().map(n => `<div class="card p-6"><p class="text-xs font-bold text-gray-700 mb-2 leading-relaxed">${n.t}</p><div class="flex justify-between items-center"><span class="text-[7px] font-black text-gray-400 uppercase italic">📅 ${n.d}</span><button onclick="delN('${n.id}')" class="text-red-200 text-[10px] font-black uppercase">Borrar</button></div></div>`).join('')}</div>`;
         }
