@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <!-- Se mantiene el escalado para permitir zoom con los dedos -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v26.0</title>
+    <title>Preceptor Pro v26.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -28,7 +28,7 @@
         .schedule-grid { display: grid; grid-template-columns: 110px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
         .schedule-cell { background: white; padding: 8px; text-align: center; font-size: 10px; min-height: 65px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
 
-        .student-name-full { font-weight: 900; font-size: 11px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 10px; line-height: 1.2; }
+        .student-name-full { font-weight: 900; font-size: 11px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 5px; line-height: 1.1; }
     </style>
 </head>
 <body class="pb-32">
@@ -38,7 +38,7 @@
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
                 <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">V26.0 FINAL</div>
+            <div class="text-[9px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded">V26.1 MASTER</div>
         </header>
 
         <div id="alerts" class="px-6 mb-4 space-y-2"></div>
@@ -201,10 +201,10 @@
                     const dia = db.attendance[dateStr][db.course];
                     return header + `<div class="space-y-3 pb-24">` + list.map(s => {
                         const val = dia[s] || '';
-                        return `<div class="card p-4 flex justify-between items-center px-4 ${val==='ACAP'?'bg-amber-50 border-l-8 border-amber-400':''}">
+                        return `<div class="card p-4 flex justify-between items-center px-3 ${val==='ACAP'?'bg-amber-50 border-l-8 border-amber-400':''}">
                             <div class="student-name-full">${s}</div>
-                            <div class="flex gap-1 overflow-x-auto no-scrollbar">
-                                ${['P','A','J','S','ACAP'].map(o => `<button onclick="toggleAsis('${s}','${o}')" class="px-2 h-9 rounded-lg font-black text-[9px] border min-w-[32px] ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">${o==='ACAP'?'💼 ACAP':getIco(o)}</button>`).join('')}
+                            <div class="flex gap-1">
+                                ${['P','A','J','S','ACAP'].map(o => `<button onclick="toggleAsis('${s}','${o}')" class="px-1.5 h-8 rounded-lg font-black text-[9px] border min-w-[28px] ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">${o==='ACAP'?'💼':getIco(o)}</button>`).join('')}
                             </div>
                         </div>`;
                     }).join('') + `</div>`;
@@ -271,7 +271,11 @@
         }
 
         function jumpDate(v) { if(v) { db.date = new Date(v + "T12:00:00"); render(); } }
-        function getIco(v) { if(v==='J') return '🩺 J'; if(v==='S') return '🚫 S'; return v; }
+        function getIco(v) { 
+            if(v==='J') return '🩺'; 
+            if(v==='S') return '🚫'; 
+            return v; 
+        }
         function getCol(v) {
             if(v==='P') return 'bg-green-500 border-green-500 text-white';
             if(v==='A') return 'bg-red-500 border-red-500 text-white';
