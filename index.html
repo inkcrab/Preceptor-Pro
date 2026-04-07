@@ -2,70 +2,61 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v28.0 - Master Gold</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Preceptor Pro V28.1 Master Gold</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root { --ios-bg: #f2f2f7; --accent: #2563eb; }
-        body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); color: #1c1c1e; -webkit-font-smoothing: antialiased; }
-        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        .card { background: white; border-radius: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.05); transition: all 0.3s ease; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; background-color: #F2F5F9; color: #1c1c1e; margin: 0 auto; max-width: 480px; min-height: 100vh; }
+        .heavy-italic { font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: -0.5px; }
+        .card { background: white; border-radius: 28px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; }
         
-        .bg-5a-boea { background-color: #f3f0ff !important; border-left: 8px solid #a78bfa !important; }
-        .bg-5b-boea { background-color: #fff1f2 !important; border-left: 8px solid #9f1239 !important; }
-        .bg-5a-boi { background-color: #f0f9ff !important; border-left: 8px solid #0ea5e9 !important; }
+        /* Colores de Cursos Originales */
+        .bg-5a-boea { background-color: #f3f0ff !important; border-left: 10px solid #a78bfa !important; }
+        .bg-5b-boea { background-color: #fff1f2 !important; border-left: 10px solid #f43f5e !important; }
+        .bg-5a-boi { background-color: #f0f9ff !important; border-left: 10px solid #0ea5e9 !important; }
         
-        .tab-btn { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 6px; border-radius: 10px; flex: 1; text-align: center; transition: 0.2s; }
-        .tab-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+        .tab-btn { font-size: 10px; font-weight: 900; text-transform: uppercase; padding: 12px 6px; border-radius: 12px; flex: 1; text-align: center; transition: 0.2s; color: #8A95A5; }
+        .tab-btn.active { background: white; color: #2563eb; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         
-        .monthly-scroll-container { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; border-radius: 12px; background: white; }
-        .monthly-table { border-collapse: collapse; width: 100%; font-size: 11px; }
-        .monthly-table th, .monthly-table td { border: 1px solid #f0f0f0; padding: 8px 4px; text-align: center; min-width: 38px; }
-        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; min-width: 130px !important; text-align: left !important; padding-left: 10px !important; font-weight: 700; box-shadow: 2px 0 5px rgba(0,0,0,0.05); }
-
-        .schedule-grid { display: grid; grid-template-columns: 100px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
-        .schedule-cell { background: white; padding: 6px; text-align: center; font-size: 10px; min-height: 60px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
-
-        .student-name-full { font-weight: 900; font-size: 10.5px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 4px; line-height: 1.1; }
+        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; min-width: 130px !important; text-align: left !important; padding-left: 10px !important; font-weight: 900; box-shadow: 2px 0 5px rgba(0,0,0,0.03); font-style: italic; text-transform: uppercase; }
+        .asis-btn { height: 34px; border-radius: 10px; font-weight: 900; font-size: 9px; border: 1px solid; min-width: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         
-        .asis-btn { height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
-        
-        .acap-highlight { background-color: #fffbeb !important; border: 2px solid #fbbf24 !important; border-left-width: 12px !important; transform: scale(1.02); z-index: 5; }
-        .acap-badge { background: #fbbf24; color: #78350f; font-size: 7px; font-weight: 900; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; margin-bottom: 2px; display: inline-block; }
-        
-        input[type="checkbox"] { accent-color: var(--accent); }
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); }
+        input[type="checkbox"] { width: 22px; height: 22px; accent-color: #2563eb; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
 <body class="pb-32">
-    <div id="app" class="max-w-4xl mx-auto min-h-screen relative">
+    <div id="app" class="relative">
+        <!-- Header Fijo -->
         <header class="px-6 pt-8 pb-4 flex justify-between items-end">
             <div>
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
-                <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
+                <h1 class="text-2xl heavy-italic leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-white bg-yellow-600 px-2 py-1 rounded">V28.0 MASTER GOLD</div>
+            <div class="text-[8px] font-black text-white bg-blue-600 px-3 py-1 rounded-full uppercase italic">V28.1 GOLD</div>
         </header>
 
-        <div id="alerts" class="px-6 mb-4 space-y-2"></div>
+        <main id="main" class="px-4 mt-2"></main>
 
-        <main id="main" class="px-4"></main>
-
-        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-md glass rounded-[2.2rem] p-2 flex justify-around shadow-2xl border border-white/40 z-50">
+        <!-- Nav Estilo V23/V26 -->
+        <nav class="fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-[400px] glass rounded-[32px] p-2 flex justify-around shadow-2xl border border-white/50 z-50">
             <button onclick="setView('home')" class="flex flex-col items-center p-2" id="nav-home">
-                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                <svg class="w-6 h-6 mb-1" fill="currentColor" viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
                 <span class="text-[8px] font-black uppercase">Cursos</span>
             </button>
             <button onclick="setView('schedule')" class="flex flex-col items-center p-2" id="nav-schedule">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 <span class="text-[8px] font-black uppercase">Horarios</span>
             </button>
             <button onclick="setView('agenda')" class="flex flex-col items-center p-2" id="nav-agenda">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 <span class="text-[8px] font-black uppercase">Agenda</span>
             </button>
             <button onclick="setView('notes')" class="flex flex-col items-center p-2" id="nav-notes">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 <span class="text-[8px] font-black uppercase">Notas</span>
             </button>
         </nav>
@@ -73,15 +64,14 @@
 
     <script>
         const KEY = 'prec_v28_master_gold';
-        const HORARIOS = ["12:30 a 13:10", "13:10 a 13:50", "13:50 a 14:30", "14:40 a 15:20", "15:20 a 16:00", "16:00 a 16:40", "16:50 a 17:30", "17:30 a 18:10"];
         const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
+        const HORARIOS = ["12:30 a 13:10", "13:10 a 13:50", "13:50 a 14:30", "14:40 a 15:20", "15:20 a 16:00", "16:00 a 16:40", "16:50 a 17:30", "17:30 a 18:10"];
 
         let db = {
             view: 'home',
             course: null,
             sub: 'asis',
             asisMode: 'day',
-            sort: 'abc',
             date: new Date(),
             students: {
                 "5° A BOEA": ["01 ALVAREZ", "02 BENITEZ", "10 CESPEDES"],
@@ -89,62 +79,30 @@
                 "5° A BOI": ["01 SOSA", "02 VACA", "10 YEDRO"]
             },
             attendance: {},
-            // Nuevo sistema de listas múltiples
-            multiLists: {}, // Estructura: { "5° A BOEA": [ {id, name, count, labels:[], data:{}} ] }
+            multiLists: {}, // { "Curso": [ {id, name, count, labels:[], data:{}} ] }
             acap: {},
             schedule: {},
             notes: [],
-            events: [
-                {d:25, m:4, y:2026, t:'Revolución de Mayo', f:true},
-                {d:2, m:3, y:2026, t:'Malvinas / Viernes Santo', f:true}
-            ]
+            events: []
         };
 
         function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
-        
         function load() {
             const data = localStorage.getItem(KEY);
             if(data) {
                 const parsed = JSON.parse(data);
                 db = {...db, ...parsed};
-                // Aseguramos que la fecha cargada sea un objeto Date
                 db.date = new Date(db.date);
                 if(isNaN(db.date.getTime())) db.date = new Date();
-            } else {
-                db.date = new Date();
-                db.date.setHours(12, 0, 0, 0);
             }
         }
 
         function setView(v) { db.view = v; if(v!=='course') db.course=null; render(); }
-        
-        function getSortedList(c) {
-            let l = [...(db.students[c] || [])];
-            if(db.sort === 'abc') return l.sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
-            const counts = {};
-            l.forEach(s => {
-                counts[s] = 0;
-                Object.values(db.attendance).forEach(day => { if(day[c]?.[s] === 'A') counts[s]++; });
-            });
-            return l.sort((a,b) => counts[b] - counts[a]);
-        }
 
         function render() {
             const main = document.getElementById('main');
             const activeDate = new Date(db.date);
             document.getElementById('top-date').innerText = activeDate.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'}).toUpperCase();
-
-            const alerts = [];
-            const todayReal = new Date();
-            for(let i=0; i<=3; i++){
-                const check = new Date(todayReal); check.setDate(todayReal.getDate()+i);
-                db.events.filter(e => e.d===check.getDate() && e.m===check.getMonth()).forEach(e => alerts.push({t:e.t, d:i, f:e.f}));
-            }
-            document.getElementById('alerts').innerHTML = alerts.map(a => `
-                <div class="${a.d===0?'bg-red-600 shadow-lg shadow-red-100':'bg-blue-600 shadow-lg shadow-blue-100'} text-white p-4 rounded-2xl flex items-center gap-3">
-                    <span class="text-xl">${a.f?'🇦🇷':'🔔'}</span>
-                    <div><p class="text-[7px] font-black uppercase opacity-60">${a.d===0?'Hoy':`En ${a.d} días`}</p><p class="text-xs font-bold uppercase">${a.t}</p></div>
-                </div>`).join('');
 
             if(db.view==='home') renderHome(main);
             else if(db.view==='course') renderCourse(main);
@@ -154,15 +112,6 @@
             save();
         }
 
-        function renderHome(c) {
-            c.innerHTML = `<p class="text-[10px] font-black text-gray-400 mb-6 uppercase tracking-widest italic">Cursos</p>` +
-            Object.keys(db.students).map(cur => `
-                <div onclick="db.view='course';db.course='${cur}';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer ${getCourseStyle(cur)}">
-                    <h2 class="text-2xl font-black italic uppercase tracking-tighter">${cur}</h2>
-                    <span class="text-gray-300">→</span>
-                </div>`).join('');
-        }
-
         function getCourseStyle(c) {
             if(c.includes('A BOEA')) return 'bg-5a-boea';
             if(c.includes('B BOEA')) return 'bg-5b-boea';
@@ -170,230 +119,144 @@
             return 'bg-white';
         }
 
+        function renderHome(c) {
+            c.innerHTML = `<p class="text-[10px] font-black text-gray-400 mb-6 uppercase tracking-widest italic ml-2">Seleccionar Curso</p>` +
+            Object.keys(db.students).map(cur => `
+                <div onclick="db.view='course';db.course='${cur}';render()" class="card p-8 mb-4 flex justify-between items-center cursor-pointer ${getCourseStyle(cur)}">
+                    <h2 class="text-2xl heavy-italic tracking-tighter">${cur}</h2>
+                    <span class="text-blue-400 font-black">→</span>
+                </div>`).join('');
+        }
+
         function renderCourse(c) {
             c.innerHTML = `
                 <div class="flex items-center gap-4 mb-6">
-                    <button onclick="setView('home')" class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 font-bold">←</button>
-                    <h2 class="text-xl font-black italic uppercase">${db.course}</h2>
+                    <button onclick="setView('home')" class="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 font-black">←</button>
+                    <h2 class="text-xl heavy-italic">${db.course}</h2>
                 </div>
-                <div class="flex bg-gray-200/50 p-1 rounded-2xl mb-4 gap-1 overflow-x-auto no-scrollbar">
-                    <button onclick="db.sub='asis';render()" class="tab-btn ${db.sub==='asis'?'active':'inactive'}">Asistencia</button>
-                    <button onclick="db.sub='acap';render()" class="tab-btn ${db.sub==='acap'?'active':'inactive'}">ACAP</button>
-                    <button onclick="db.sub='list';render()" class="tab-btn ${db.sub==='list'?'active':'inactive'}">Listas</button>
-                    <button onclick="db.sub='edit';render()" class="tab-btn ${db.sub==='edit'?'active':'inactive'}">Editar</button>
+                <div class="flex bg-gray-200/50 p-1.5 rounded-2xl mb-6 gap-1">
+                    <button onclick="db.sub='asis';render()" class="tab-btn ${db.sub==='asis'?'active':''}">Asistencia</button>
+                    <button onclick="db.sub='acap';render()" class="tab-btn ${db.sub==='acap'?'active':''}">ACAP</button>
+                    <button onclick="db.sub='list';render()" class="tab-btn ${db.sub==='list'?'active':''}">Listas</button>
+                    <button onclick="db.sub='edit';render()" class="tab-btn ${db.sub==='edit'?'active':''}">Editar</button>
                 </div>
-                <div id="course-content">${renderCourseDetail()}</div>`;
+                <div id="course-content">${renderSubView()}</div>`;
         }
 
-        function renderCourseDetail() {
-            const list = getSortedList(db.course);
+        function renderSubView() {
+            const list = [...(db.students[db.course] || [])].sort((a,b) => a.localeCompare(b, undefined, {numeric: true}));
             const dateStr = db.date.toLocaleDateString();
 
             if(db.sub === 'asis') {
-                const studentsInAcapToday = list.filter(s => {
-                    const acData = db.acap[dateStr]?.[db.course]?.[s];
-                    return acData && (acData.h || acData.l);
-                });
+                if(!db.attendance[dateStr]) db.attendance[dateStr] = {};
+                if(!db.attendance[dateStr][db.course]) db.attendance[dateStr][db.course] = {};
+                const dia = db.attendance[dateStr][db.course];
 
-                let acapAlert = '';
-                if(studentsInAcapToday.length > 0 && db.asisMode === 'day') {
-                    acapAlert = `
-                    <div class="bg-amber-100 border-2 border-amber-400 p-3 rounded-2xl mb-4 flex items-center gap-3 animate-pulse">
-                        <span class="text-xl">💼</span>
-                        <div>
-                            <p class="text-[8px] font-black text-amber-800 uppercase">Aviso de ACAP hoy</p>
-                            <p class="text-[10px] font-bold text-amber-900 leading-tight">
-                                ${studentsInAcapToday.length} alumno(s) registrados en ACAP.
-                            </p>
-                        </div>
-                    </div>`;
-                }
-
-                let header = acapAlert + `
-                <div class="flex bg-white p-1 rounded-xl mb-4 gap-1 shadow-sm border border-gray-100">
-                    <button onclick="db.asisMode='day';render()" class="tab-btn ${db.asisMode==='day'?'bg-blue-600 text-white':'text-gray-400'}">Día</button>
-                    <button onclick="db.asisMode='week';render()" class="tab-btn ${db.asisMode==='week'?'bg-blue-600 text-white':'text-gray-400'}">Semana</button>
-                    <button onclick="db.asisMode='month';render()" class="tab-btn ${db.asisMode==='month'?'bg-blue-600 text-white':'text-gray-400'}">Mes</button>
+                return `
+                <div class="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm mb-6 border">
+                    <button onclick="moveD(-1)" class="w-8 h-8 flex items-center justify-center text-blue-600 font-black">‹</button>
+                    <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="text-[10px] font-black uppercase text-blue-600 border-none bg-transparent">
+                    <button onclick="moveD(1)" class="w-8 h-8 flex items-center justify-center text-blue-600 font-black">›</button>
                 </div>
-                <div class="flex justify-between items-center mb-4 px-1">
-                    <div class="flex gap-2">
-                        <button onclick="db.sort='abc';render()" class="text-[8px] font-black uppercase ${db.sort==='abc'?'text-blue-600 underline':'text-gray-300'}">ABC</button>
-                        <button onclick="db.sort='faltas';render()" class="text-[8px] font-black uppercase ${db.sort==='faltas'?'text-blue-600 underline':'text-gray-300'}">FALTAS</button>
-                    </div>
-                    <div class="flex items-center gap-1 bg-white px-2 py-1 rounded-lg shadow-sm border">
-                        <button onclick="moveD(-1)" class="text-blue-600 text-xl font-bold px-1">‹</button>
-                        <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="text-[10px] font-black uppercase text-blue-600 border-none bg-transparent w-24">
-                        <button onclick="moveD(1)" class="text-blue-600 text-xl font-bold px-1">›</button>
-                    </div>
-                </div>`;
-
-                if(db.asisMode === 'day') {
-                    if(!db.attendance[dateStr]) db.attendance[dateStr] = {};
-                    if(!db.attendance[dateStr][db.course]) db.attendance[dateStr][db.course] = {};
-                    const dia = db.attendance[dateStr][db.course];
-
-                    return header + `<div class="space-y-2 pb-24">` + list.map(s => {
-                        const val = dia[s] || '';
-                        const acInfo = db.acap[dateStr]?.[db.course]?.[s];
-                        const hasAcap = acInfo && (acInfo.h || acInfo.l);
-                        
-                        return `
-                        <div class="card p-3 flex justify-between items-center gap-2 ${hasAcap ? 'acap-highlight' : (val==='ACAP'?'bg-amber-50 border-l-4 border-amber-400':'')}">
-                            <div class="flex flex-col">
-                                ${hasAcap ? `<span class="acap-badge">ACAP: ${acInfo.h || ''} en ${acInfo.l || 'ver ACAP'}</span>` : ''}
-                                <div class="student-name-full">${s}</div>
-                            </div>
-                            <div class="flex gap-1 shrink-0">
-                                ${['P','A','J','S','ACAP'].map(o => `
-                                    <button onclick="toggleAsis('${s}','${o}')" class="asis-btn ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">
-                                        ${o==='ACAP'?'💼':o}
-                                    </button>`).join('')}
-                            </div>
-                        </div>`;
-                    }).join('') + `</div>`;
-                }
-
-                if(db.asisMode === 'week') {
-                    const start = new Date(db.date); start.setDate(start.getDate() - start.getDay() + 1);
-                    const week = []; for(let i=0; i<5; i++){ const d = new Date(start); d.setDate(d.getDate()+i); week.push(d.toLocaleDateString()); }
-                    return header + `<div class="monthly-scroll-container border"><table class="monthly-table">
-                        <thead class="bg-gray-50 uppercase text-[8px]"><tr><th class="sticky-col">Alumno</th>${week.map(d => `<th>${d.split('/')[0]}/${d.split('/')[1]}</th>`).join('')}</tr></thead>
-                        <tbody class="uppercase font-bold text-[9px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${week.map(d => {
-                            const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            const hasAc = db.acap[d]?.[db.course]?.[s];
-                            const cellStyle = hasAc ? 'bg-amber-100' : '';
-                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''} ${cellStyle}"><b>${v}</b></td>`;
-                        }).join('')}</tr>`).join('')}</tbody>
-                    </table></div>`;
-                }
-
-                if(db.asisMode === 'month') {
-                    const m = db.date.getMonth(); const y = db.date.getFullYear();
-                    const daysInMonth = new Date(y, m+1, 0).getDate();
-                    const dates = []; for(let i=1; i<=daysInMonth; i++) dates.push(new Date(y, m, i).toLocaleDateString());
-                    return header + `<div class="monthly-scroll-container border"><table class="monthly-table">
-                        <thead class="bg-gray-100 uppercase text-[7px] font-black"><tr><th class="sticky-col">Alumno</th>${dates.map(d => `<th>${d.split('/')[0]}</th>`).join('')}</tr></thead>
-                        <tbody class="uppercase font-bold text-[8px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${dates.map(d => {
-                            const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            const hasAc = db.acap[d]?.[db.course]?.[s];
-                            const color = hasAc ? 'bg-amber-200 text-amber-800' : (v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='S'?'bg-orange-50 text-orange-500':v==='ACAP'?'bg-amber-100 text-amber-700':'');
-                            return `<td class="${color}">${v}</td>`;
-                        }).join('')}</tr>`).join('')}</tbody>
-                    </table></div>`;
-                }
+                <div class="space-y-2 pb-10">` + list.map(s => `
+                    <div class="card p-3 flex justify-between items-center gap-2">
+                        <div class="text-[10px] font-black uppercase italic text-gray-600 flex-1">${s}</div>
+                        <div class="flex gap-1">
+                            ${['P','A','J','S'].map(o => `
+                                <button onclick="toggleAsis('${s}','${o}')" class="asis-btn ${dia[s]===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">
+                                    ${o}
+                                </button>`).join('')}
+                        </div>
+                    </div>`).join('') + `</div>`;
             }
 
             if(db.sub === 'acap') {
                 return `
-                <div class="flex items-center gap-1 bg-white px-2 py-2 rounded-lg shadow-sm border mb-4">
-                    <button onclick="moveD(-1)" class="text-blue-600 text-xl font-bold px-2">‹</button>
-                    <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="flex-1 text-[10px] font-black uppercase text-blue-600 border-none bg-transparent text-center">
-                    <button onclick="moveD(1)" class="text-blue-600 text-xl font-bold px-2">›</button>
+                <div class="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm mb-6 border">
+                    <button onclick="moveD(-1)" class="w-8 h-8 flex items-center justify-center text-blue-600 font-black">‹</button>
+                    <input type="date" value="${db.date.toISOString().split('T')[0]}" onchange="jumpDate(this.value)" class="text-[10px] font-black uppercase text-blue-600 border-none bg-transparent">
+                    <button onclick="moveD(1)" class="w-8 h-8 flex items-center justify-center text-blue-600 font-black">›</button>
                 </div>
-                <div class="bg-blue-50 p-4 rounded-2xl mb-4 border border-blue-100">
-                    <p class="text-[9px] font-bold text-blue-900 leading-tight italic underline">Nota: Lo que cargues para hoy afecta a la lista de asistencia del día seleccionado.</p>
-                </div>
-                <div class="space-y-3 pb-24">` + list.map(s => {
+                <div class="space-y-3 pb-10">` + list.map(s => {
                     if(!db.acap[dateStr]) db.acap[dateStr] = {};
                     if(!db.acap[dateStr][db.course]) db.acap[dateStr][db.course] = {};
-                    const ac = db.acap[dateStr][db.course];
-                    const d = ac[s] || {h:'', l:''};
+                    const d = db.acap[dateStr][db.course][s] || {h:'', l:''};
                     return `<div class="card p-4">
-                        <div class="flex justify-between items-center mb-2">
-                            <p class="text-[10px] font-black uppercase text-amber-600">${s}</p>
-                            ${(d.h || d.l) ? '<span class="text-[7px] font-black bg-green-500 text-white px-2 py-0.5 rounded-full">CARGADO</span>' : ''}
-                        </div>
+                        <p class="text-[9px] font-black uppercase text-amber-600 mb-2">${s}</p>
                         <div class="flex gap-2">
-                            <input onchange="saveAc('${s}','h',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Horario" value="${d.h}">
-                            <input onchange="saveAc('${s}','l',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Lugar" value="${d.l}">
+                            <input onchange="saveAc('${s}','h',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="HORA" value="${d.h}">
+                            <input onchange="saveAc('${s}','l',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="LUGAR" value="${d.l}">
                         </div>
                     </div>`;
                 }).join('') + `</div>`;
             }
 
             if(db.sub === 'list') {
-                return renderListsSub(list);
+                if(!db.multiLists[db.course]) db.multiLists[db.course] = [];
+                const courseLists = db.multiLists[db.course];
+
+                let h = `
+                <div class="flex justify-between items-center mb-6 px-1">
+                    <h3 class="text-[10px] font-black uppercase text-gray-400 italic">Mis Listas Especiales</h3>
+                    <button onclick="createNewList()" class="bg-blue-600 text-white text-[9px] font-black px-4 py-2 rounded-full shadow-lg">+ NUEVA LISTA</button>
+                </div>`;
+
+                if(courseLists.length === 0) {
+                    h += `<div class="card p-12 text-center text-gray-300 heavy-italic text-[10px] italic">No hay listas creadas</div>`;
+                }
+
+                courseLists.forEach((listObj, lIdx) => {
+                    h += `
+                    <div class="card mb-6 border-2 border-blue-50">
+                        <div class="bg-gray-50/50 p-4 flex justify-between items-center border-b">
+                            <input type="text" onchange="renameList(${lIdx}, this.value)" class="bg-transparent heavy-italic text-sm border-none p-0 text-blue-600 w-2/3" value="${listObj.name}">
+                            <div class="flex gap-3">
+                                <button onclick="editListCount(${lIdx})" class="text-gray-400 text-sm">⚙️</button>
+                                <button onclick="deleteList(${lIdx})" class="text-red-300 font-black">×</button>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto p-2 no-scrollbar">
+                            <table class="w-full">
+                                <thead class="text-[7px] font-black uppercase text-gray-400">
+                                    <tr>
+                                        <th class="p-2 text-left min-w-[120px]">Alumno</th>
+                                        ${Array.from({length: listObj.count}).map((_, i) => `
+                                            <th class="p-2">
+                                                <input type="text" onchange="renameLabel(${lIdx}, ${i}, this.value)" class="w-12 text-center bg-white border border-gray-100 rounded py-1 text-[7px] font-black" value="${listObj.labels[i] || 'ITEM '+(i+1)}">
+                                            </th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody class="text-[9px] font-black uppercase">
+                                    ${list.map(s => `
+                                        <tr class="border-t border-gray-50">
+                                            <td class="p-2 text-gray-500 italic">${s}</td>
+                                            ${Array.from({length: listObj.count}).map((_, i) => `
+                                                <td class="p-2 text-center">
+                                                    <input type="checkbox" ${ (listObj.data[s] && listObj.data[s][i]) ? 'checked' : '' } onchange="toggleMultiCk(${lIdx}, '${s}', ${i})">
+                                                </td>`).join('')}
+                                        </tr>`).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                });
+                return h;
             }
 
             if(db.sub === 'edit') {
                 return `<div class="card p-6">
-                    <p class="text-[10px] font-black text-gray-400 mb-4 uppercase italic">Importar Lista de Alumnos</p>
-                    <textarea id="imp-box" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-4" placeholder="Copia y pega la lista..."></textarea>
-                    <button onclick="impS()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Guardar Lista</button>
+                    <p class="text-[10px] font-black text-gray-400 mb-4 uppercase italic tracking-widest">Importar / Pegar Lista</p>
+                    <textarea id="imp-box" class="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold border-none h-40 mb-4" placeholder="01 APE...&#10;02 APE..."></textarea>
+                    <button onclick="impS()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Actualizar Lista</button>
                 </div>`;
             }
         }
 
-        // --- SISTEMA DE LISTAS MULTIPLES ---
-        function renderListsSub(studentList) {
-            if(!db.multiLists[db.course]) db.multiLists[db.course] = [];
-            const courseLists = db.multiLists[db.course];
-
-            let html = `
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xs font-black uppercase text-gray-500">Mis Listas Especiales</h3>
-                    <button onclick="createNewList()" class="bg-blue-600 text-white text-[9px] font-black px-4 py-2 rounded-full shadow-lg">+ NUEVA LISTA</button>
-                </div>
-            `;
-
-            if(courseLists.length === 0) {
-                html += `<div class="card p-10 text-center text-gray-300 font-black text-[10px] uppercase italic">No tienes listas creadas para este curso</div>`;
-            }
-
-            courseLists.forEach((listObj, lIndex) => {
-                html += `
-                <div class="card mb-8 border-2 border-gray-100">
-                    <div class="bg-gray-50 p-4 flex justify-between items-center border-b">
-                        <div class="flex-1 mr-2">
-                            <input type="text" onchange="renameList(${lIndex}, this.value)" class="w-full bg-transparent font-black italic uppercase text-sm border-none p-0 text-blue-700" value="${listObj.name}">
-                            <p class="text-[7px] font-bold text-gray-400 uppercase mt-1">${listObj.count} Casilleros</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="editListParams(${lIndex})" class="text-gray-400 text-lg">⚙️</button>
-                            <button onclick="deleteList(${lIndex})" class="text-red-300 text-lg">×</button>
-                        </div>
-                    </div>
-                    
-                    <div class="p-2 overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="text-[7px] font-black uppercase text-gray-400">
-                                <tr>
-                                    <th class="p-2">Alumno</th>
-                                    <th class="p-2 flex gap-2">
-                                        ${Array.from({length: listObj.count}).map((_, i) => `
-                                            <input type="text" 
-                                                   onchange="renameLabel(${lIndex}, ${i}, this.value)" 
-                                                   class="w-12 text-center bg-white border border-gray-200 rounded p-1 text-[7px]" 
-                                                   value="${listObj.labels[i] || 'Item '+(i+1)}">
-                                        `).join('')}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="text-[9px] font-bold uppercase">
-                                ${studentList.map(s => `
-                                    <tr class="border-t border-gray-50">
-                                        <td class="p-2 text-gray-600 whitespace-nowrap">${s}</td>
-                                        <td class="p-2 flex gap-2">
-                                            ${Array.from({length: listObj.count}).map((_, i) => {
-                                                const checked = listObj.data[s] && listObj.data[s][i];
-                                                return `<input type="checkbox" ${checked?'checked':''} onchange="toggleMultiCk(${lIndex}, '${s}', ${i})" class="w-12 h-5">`;
-                                            }).join('')}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>`;
-            });
-
-            return html + `<div class="h-20"></div>`;
-        }
-
+        // --- Funciones de Gestión de Listas ---
         function createNewList() {
-            const name = prompt("Nombre de la nueva lista:", "Lista " + (db.multiLists[db.course].length + 1));
+            const name = prompt("NOMBRE DE LA LISTA:", "LISTA " + (db.multiLists[db.course].length + 1));
             if(!name) return;
-            const count = parseInt(prompt("¿Cuántos casilleros (checks) tendrá?", "3"));
+            const count = parseInt(prompt("CANTIDAD DE CASILLEROS (1-10):", "3"));
             if(isNaN(count) || count < 1) return;
             
             db.multiLists[db.course].push({
@@ -406,60 +269,29 @@
             render();
         }
 
-        function renameList(idx, val) {
-            db.multiLists[db.course][idx].name = val.toUpperCase();
-            save();
+        function renameList(idx, val) { db.multiLists[db.course][idx].name = val.toUpperCase(); save(); }
+        function renameLabel(lIdx, iIdx, val) { db.multiLists[db.course][lIdx].labels[iIdx] = val.toUpperCase(); save(); }
+        function deleteList(idx) { if(confirm("¿BORRAR LISTA?")) { db.multiLists[db.course].splice(idx, 1); render(); } }
+        function editListCount(idx) {
+            const nc = parseInt(prompt("NUEVA CANTIDAD DE CASILLEROS:", db.multiLists[db.course][idx].count));
+            if(!isNaN(nc) && nc > 0) { db.multiLists[db.course][idx].count = nc; render(); }
         }
-
-        function renameLabel(lIdx, itemIdx, val) {
-            db.multiLists[db.course][lIdx].labels[itemIdx] = val;
-            save();
-        }
-
-        function toggleMultiCk(lIdx, student, checkIdx) {
+        function toggleMultiCk(lIdx, s, cIdx) {
             const list = db.multiLists[db.course][lIdx];
-            if(!list.data[student]) list.data[student] = {};
-            list.data[student][checkIdx] = !list.data[student][checkIdx];
+            if(!list.data[s]) list.data[s] = {};
+            list.data[s][cIdx] = !list.data[s][cIdx];
             save();
         }
 
-        function deleteList(idx) {
-            if(confirm("¿Seguro quieres borrar esta lista? Se perderán todos sus datos.")) {
-                db.multiLists[db.course].splice(idx, 1);
-                render();
-            }
-        }
-
-        function editListParams(idx) {
-            const list = db.multiLists[db.course][idx];
-            const newCount = parseInt(prompt("Cambiar cantidad de casilleros (actual: " + list.count + "):", list.count));
-            if(!isNaN(newCount) && newCount > 0) {
-                list.count = newCount;
-                render();
-            }
-        }
-
-        // --- FUNCIONES DE CALENDARIO Y NAVEGACION ---
-        function jumpDate(v) { 
-            if(v) { 
-                db.date = new Date(v + "T12:00:00"); 
-                render(); 
-            } 
-        }
-
-        function moveD(v) { 
-            db.date.setDate(db.date.getDate()+v); 
-            render(); 
-        }
-
+        // --- Navegación y Fecha ---
+        function jumpDate(v) { if(v) { db.date = new Date(v + "T12:00:00"); render(); } }
+        function moveD(v) { db.date.setDate(db.date.getDate()+v); render(); }
         function getCol(v) {
             if(v==='P') return 'bg-green-500 border-green-500 text-white';
             if(v==='A') return 'bg-red-500 border-red-500 text-white';
             if(v==='J') return 'bg-blue-500 border-blue-500 text-white';
             if(v==='S') return 'bg-orange-600 border-orange-600 text-white';
-            if(v==='ACAP') return 'bg-amber-500 border-amber-500 text-white';
         }
-
         function toggleAsis(s, v) {
             const dk = db.date.toLocaleDateString();
             if(!db.attendance[dk]) db.attendance[dk] = {};
@@ -468,96 +300,75 @@
             render();
         }
 
-        // --- OTROS RENDERS (Iguales a Master para no cambiar diseño) ---
-        function renderSchedule(c) {
-            if(!db.course) {
-                c.innerHTML = `<h2 class="text-xl font-black italic mb-6 uppercase">Horarios Escolares</h2>` + 
-                Object.keys(db.students).map(cur => `<button onclick="db.course='${cur}';render()" class="card p-6 mb-3 w-full text-left font-black italic uppercase text-sm ${getCourseStyle(cur)}">${cur} →</button>`).join('');
-                return;
-            }
-            c.innerHTML = `
-                <div class="flex items-center gap-4 mb-4"><button onclick="db.course=null;render()" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-lg font-black italic uppercase">${db.course}</h2></div>
-                <div class="card p-1 overflow-x-auto"><div class="schedule-grid" style="min-width:600px">
-                    <div class="schedule-cell font-black bg-gray-50 text-[8px]">HORA</div>${DIAS.map(d => `<div class="schedule-cell font-black bg-gray-50 text-[8px]">${d}</div>`).join('')}
-                    ${HORARIOS.map((h, i) => `
-                        <div class="schedule-cell font-black bg-gray-50 text-[8px]">${h}</div>
-                        ${DIAS.map(d => {
-                            const k = `${db.course}_${d}_${i}`; const val = db.schedule[k] || {m:'',p:''};
-                            return `<div class="schedule-cell">
-                                <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-bold text-blue-600 text-[9px] bg-transparent border-none p-0" placeholder="..." value="${val.m}">
-                                <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 text-[7px] bg-transparent border-none p-0 uppercase" placeholder="..." value="${val.p}">
-                            </div>`;
-                        }).join('')}
-                    `).join('')}
-                </div></div>`;
-        }
-
-        function saveS(k, f, v) { if(!db.schedule[k]) db.schedule[k]={m:'',p:''}; db.schedule[k][f]=v; save(); }
-
-        function renderAgenda(c) {
-            const m = db.date.getMonth(); const y = db.date.getFullYear();
-            const first = new Date(y, m, 1).getDay(); const total = new Date(y, m + 1, 0).getDate();
-            const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-            c.innerHTML = `
-                <div class="flex justify-between items-center mb-6 px-2">
-                    <div><h2 class="text-2xl font-black italic uppercase">${meses[m]}</h2><p class="text-[10px] font-black text-blue-600 tracking-widest">${y}</p></div>
-                    <div class="flex gap-2"><button onclick="chM(-1)" class="w-10 h-10 bg-white rounded-xl shadow-sm text-blue-600 font-bold">‹</button><button onclick="chM(1)" class="w-10 h-10 bg-white rounded-xl shadow-sm text-blue-600 font-bold">›</button></div>
-                </div>
-                <div class="card p-5 mb-6"><div class="grid grid-cols-7 gap-1">
-                    ${['D','L','M','X','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300 py-2">${d}</div>`).join('')}
-                    ${Array(first).fill(0).map(()=>`<div></div>`).join('')}
-                    ${Array.from({length: total}, (_,i)=>i+1).map(d => {
-                        const evs = db.events.filter(e => e.d===d && e.m===m); const f = evs.some(e=>e.f); const e = evs.some(e=>!e.f);
-                        return `<div onclick="shD(${d},${m},${y})" class="aspect-square flex flex-col items-center justify-center rounded-lg text-xs font-bold cursor-pointer hover:bg-gray-50 ${f?'text-red-500':e?'text-blue-600':'text-gray-700'}">${d}<div class="flex gap-0.5">${f?'<div class="w-1 h-1 bg-red-500 rounded-full"></div>':''}${e?'<div class="w-1 h-1 bg-blue-500 rounded-full"></div>':''}</div></div>`;
-                    }).join('')}
-                </div></div><div id="day-box" class="space-y-2 pb-24"></div>`;
-        }
-
-        function chM(v) { db.date.setMonth(db.date.getMonth()+v); render(); }
-        function shD(d, m, y) {
-            const evs = db.events.filter(e => e.d===d && e.m===m);
-            const box = document.getElementById('day-box');
-            box.innerHTML = `<div class="flex justify-between items-center px-2 mb-2"><span class="text-[10px] font-black uppercase text-gray-400">${d}/${m+1}/${y}</span> <button onclick="addE(${d},${m},${y})" class="text-blue-600 font-black text-[9px] uppercase">+ Añadir</button></div>
-                ${evs.length===0?'<p class="text-center text-gray-300 font-black text-[9px] py-10 uppercase italic card">Sin eventos registrados</p>':evs.map(e => `<div class="card p-4 flex justify-between items-center"><div><p class="text-xs font-bold text-gray-700">${e.t}</p><p class="text-[7px] font-black uppercase ${e.f?'text-red-500':'text-blue-500'}">${e.f?'Feriado':'Importante'}</p></div>${!e.f?`<button onclick="delE(${d},${m},'${e.t}')" class="text-red-200 text-xl">×</button>`:''}</div>`).join('')}`;
-        }
-
-        function addE(d,m,y) { const t = prompt("Evento / Cumpleaños:"); if(t) { db.events.push({d,m,y,t,f:false}); render(); shD(d,m,y); } }
-        function delE(d,m,t) { db.events = db.events.filter(e => !(e.d===d && e.m===m && e.t===t)); render(); shD(d,m,db.date.getFullYear()); }
-
-        let tN;
-        function renderNotes(c) {
-            c.innerHTML = `<h2 class="text-xl font-black italic uppercase mb-6 px-2">Notas</h2>
-            <div class="card p-6 mb-6">
-                <textarea id="nin" oninput="aS(this.value)" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-2" placeholder="Escribe algo importante..."></textarea>
-                <div id="sms" class="text-[8px] font-black text-green-500 uppercase italic opacity-0 text-right">Guardado ✓</div>
-            </div>
-            <div class="space-y-4 pb-24 px-2">${db.notes.slice().reverse().map(n => `<div class="card p-6"><p class="text-xs font-bold text-gray-700 mb-2 leading-relaxed">${n.t}</p><div class="flex justify-between items-center"><span class="text-[7px] font-black text-gray-400 uppercase italic">📅 ${n.d}</span><button onclick="delN('${n.id}')" class="text-red-200 text-[10px] font-black uppercase">Borrar</button></div></div>`).join('')}</div>`;
-        }
-
-        function aS(v) {
-            clearTimeout(tN);
-            tN = setTimeout(() => {
-                if(!v.trim()) return;
-                db.notes.push({ id: Date.now().toString(), t: v, d: new Date().toLocaleString() });
-                document.getElementById('nin').value = '';
-                document.getElementById('sms').style.opacity = 1; setTimeout(()=> { document.getElementById('sms').style.opacity = 0; render(); }, 1000);
-            }, 1500);
-        }
-
-        function delN(id) { db.notes = db.notes.filter(n => n.id!==id); render(); }
-        function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
-        
         function saveAc(s, f, v) { 
             const dk = db.date.toLocaleDateString(); 
             if(!db.acap[dk]) db.acap[dk]={}; 
             if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; 
             if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; 
             db.acap[dk][db.course][s][f] = v; 
-            if(!db.acap[dk][db.course][s].h && !db.acap[dk][db.course][s].l) {
-                delete db.acap[dk][db.course][s];
-            }
             save(); 
         }
+
+        // --- Otras Secciones Master ---
+        function renderSchedule(c) {
+            if(!db.course) {
+                c.innerHTML = `<h2 class="text-xl heavy-italic mb-6 ml-2">Horarios</h2>` + 
+                Object.keys(db.students).map(cur => `<button onclick="db.course='${cur}';render()" class="card p-6 mb-3 w-full text-left heavy-italic text-sm ${getCourseStyle(cur)}">${cur} →</button>`).join('');
+                return;
+            }
+            c.innerHTML = `
+                <div class="flex items-center gap-4 mb-4"><button onclick="db.course=null;render()" class="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm">←</button><h2 class="text-lg heavy-italic">${db.course}</h2></div>
+                <div class="card p-1 overflow-x-auto no-scrollbar"><div class="grid grid-cols-6 gap-px bg-gray-100" style="min-width:600px">
+                    <div class="bg-gray-50 p-2 font-black text-[8px] text-center">HORA</div>${DIAS.map(d => `<div class="bg-gray-50 p-2 font-black text-[8px] text-center">${d}</div>`).join('')}
+                    ${HORARIOS.map((h, i) => `
+                        <div class="bg-white p-2 font-black text-[8px] text-center">${h}</div>
+                        ${DIAS.map(d => {
+                            const k = `${db.course}_${d}_${i}`; const val = db.schedule[k] || {m:'',p:''};
+                            return `<div class="bg-white p-2">
+                                <input onchange="saveS('${k}','m',this.value)" class="w-full text-center font-black text-blue-600 text-[9px] border-none p-0" placeholder="..." value="${val.m}">
+                                <input onchange="saveS('${k}','p',this.value)" class="w-full text-center text-gray-400 text-[7px] border-none p-0 uppercase" placeholder="..." value="${val.p}">
+                            </div>`;
+                        }).join('')}
+                    `).join('')}
+                </div></div>`;
+        }
+        function saveS(k, f, v) { if(!db.schedule[k]) db.schedule[k]={m:'',p:''}; db.schedule[k][f]=v; save(); }
+
+        function renderAgenda(c) {
+            const m = db.date.getMonth(); const y = db.date.getFullYear();
+            const first = new Date(y, m, 1).getDay(); const total = new Date(y, m + 1, 0).getDate();
+            const meses = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+            c.innerHTML = `
+                <div class="flex justify-between items-center mb-6 px-2">
+                    <div><h2 class="text-2xl heavy-italic">${meses[m]}</h2><p class="text-[10px] font-black text-blue-600 tracking-widest">${y}</p></div>
+                    <div class="flex gap-2"><button onclick="chM(-1)" class="w-10 h-10 bg-white rounded-xl shadow-sm text-blue-600 font-bold">‹</button><button onclick="chM(1)" class="w-10 h-10 bg-white rounded-xl shadow-sm text-blue-600 font-bold">›</button></div>
+                </div>
+                <div class="card p-5 mb-10"><div class="grid grid-cols-7 gap-1">
+                    ${['D','L','M','X','J','V','S'].map(d => `<div class="text-center text-[9px] font-black text-gray-300 py-2">${d}</div>`).join('')}
+                    ${Array(first).fill(0).map(()=>`<div></div>`).join('')}
+                    ${Array.from({length: total}, (_,i)=>i+1).map(d => `<div onclick="shD(${d},${m},${y})" class="aspect-square flex items-center justify-center rounded-lg text-xs font-bold text-gray-700">${d}</div>`).join('')}
+                </div></div><div id="day-box" class="space-y-2"></div>`;
+        }
+        function chM(v) { db.date.setMonth(db.date.getMonth()+v); render(); }
+        function shD(d, m, y) {
+            document.getElementById('day-box').innerHTML = `<div class="card p-8 text-center text-[10px] font-black text-gray-400 uppercase italic">EVENTOS PARA EL ${d}/${m+1} PRÓXIMAMENTE</div>`;
+        }
+
+        function renderNotes(c) {
+            c.innerHTML = `<h2 class="text-xl heavy-italic mb-6 ml-2">Notas</h2>
+            <div class="card p-6 mb-6">
+                <textarea id="nin" class="w-full bg-gray-50 p-4 rounded-2xl text-xs font-bold border-none h-32 mb-4" placeholder="Escribir nota rápida..."></textarea>
+                <button onclick="addN()" class="w-full bg-blue-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase italic shadow-lg">Guardar Nota</button>
+            </div>
+            <div class="space-y-4 pb-10">${db.notes.slice().reverse().map(n => `<div class="card p-5">
+                <p class="text-xs font-bold text-gray-600 mb-2">${n.t}</p>
+                <div class="flex justify-between items-center"><span class="text-[7px] font-black text-gray-400 uppercase italic">${n.d}</span>
+                <button onclick="delN('${n.id}')" class="text-red-300 text-[10px] font-black">BORRAR</button></div>
+            </div>`).join('')}</div>`;
+        }
+        function addN() { const t = document.getElementById('nin').value; if(!t) return; db.notes.push({id:Date.now().toString(), t, d:new Date().toLocaleString()}); render(); }
+        function delN(id) { db.notes = db.notes.filter(n => n.id!==id); render(); }
+        function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
 
         window.onload = () => { load(); render(); };
     </script>
