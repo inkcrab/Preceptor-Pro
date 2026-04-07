@@ -14,7 +14,7 @@ import {
   onSnapshot 
 } from 'firebase/firestore';
 
-// Configuración de Firebase
+// --- CONFIGURACIÓN ---
 const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -33,8 +33,6 @@ export default function App() {
   const [subView, setSubView] = useState('asis');
   const [asisMode, setAsisMode] = useState('day');
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 6)); 
-  const [searchNote, setSearchNote] = useState('');
-  const [editingNoteId, setEditingNoteId] = useState(null);
   const [noteInput, setNoteInput] = useState('');
   
   const [data, setData] = useState({
@@ -54,7 +52,6 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      if (!u) setView('home');
     });
     return () => unsubscribe();
   }, []);
@@ -69,7 +66,7 @@ export default function App() {
         await createUserWithEmailAndPassword(auth, email, password);
       }
     } catch (err) {
-      setAuthError('Error: Verifique sus datos');
+      setAuthError('DATOS INCORRECTOS O USUARIO EXISTENTE');
     }
   };
 
@@ -78,8 +75,11 @@ export default function App() {
     if (!user) return;
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'appState', 'mainData');
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) setData(prev => ({ ...prev, ...docSnap.data() }));
-      else saveToCloud(data);
+      if (docSnap.exists()) {
+        setData(prev => ({ ...prev, ...docSnap.data() }));
+      } else {
+        saveToCloud(data);
+      }
     }, (err) => console.error("Error nube:", err));
     return () => unsubscribe();
   }, [user]);
@@ -103,100 +103,102 @@ export default function App() {
     saveToCloud(updated);
   };
 
-  const handleSaveNote = () => {
-    if (!noteInput.trim()) return;
-    let newNotes = [...data.notes];
-    if (editingNoteId) {
-      newNotes = newNotes.map(n => n.id === editingNoteId ? { ...n, t: noteInput, d: new Date().toLocaleString() } : n);
-      setEditingNoteId(null);
-    } else {
-      newNotes.push({ id: Date.now().toString(), t: noteInput, d: new Date().toLocaleString() });
-    }
-    const updated = { ...data, notes: newNotes };
-    setData(updated);
-    saveToCloud(updated);
-    setNoteInput('');
-  };
-
-  // SI NO HAY USUARIO, MOSTRAR LOGIN (CORREGIDO)
+  // --- PANTALLA DE ACCESO ---
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#f2f2f7] flex items-center justify-center p-6 font-sans">
-        <div className="bg-white w-full max-w-sm p-8 rounded-[2.5rem] shadow-2xl border border-gray-100 text-center">
-          <div className="mb-8">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white w-full max-w-sm p-8 rounded-3xl shadow-xl border border-gray-200">
+          <div className="text-center mb-8">
             <h1 className="text-3xl font-black italic uppercase tracking-tighter">PRECEPTOR <span className="text-blue-600">PRO</span></h1>
-            <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest italic">Acceso a la Nube</p>
+            <p className="text-[10px] font-bold text-gray-400 mt-2 uppercase tracking-widest italic tracking-wider">Acceso Seguro</p>
           </div>
           <form onSubmit={handleAuth} className="space-y-4">
-            <input type="email" placeholder="CORREO ELECTRÓNICO" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl text-xs font-black uppercase outline-none focus:ring-2 ring-blue-100 transition-all text-center" required />
-            <input type="password" placeholder="CONTRASEÑA" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-gray-50 border-none p-4 rounded-2xl text-xs font-black uppercase outline-none focus:ring-2 ring-blue-100 transition-all text-center" required />
-            {authError && <p className="text-red-500 text-[10px] font-black uppercase">{authError}</p>}
-            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-2xl text-xs font-black uppercase shadow-lg shadow-blue-100 hover:scale-[1.02] active:scale-95 transition-all">
-              {authMode === 'login' ? 'ENTRAR' : 'CREAR MI CUENTA'}
+            <input 
+              type="email" 
+              placeholder="MAIL@ESCUELA.COM" 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-xl text-xs font-black uppercase outline-none focus:border-blue-500 transition-all text-center" 
+              required 
+            />
+            <input 
+              type="password" 
+              placeholder="CONTRASEÑA" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              className="w-full bg-gray-50 border-2 border-gray-100 p-4 rounded-xl text-xs font-black uppercase outline-none focus:border-blue-500 transition-all text-center" 
+              required 
+            />
+            {authError && <p className="text-red-500 text-[9px] font-black uppercase text-center">{authError}</p>}
+            <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl text-xs font-black uppercase shadow-lg hover:bg-blue-700 transition-all active:scale-95">
+              {authMode === 'login' ? 'ENTRAR' : 'CREAR CUENTA'}
             </button>
           </form>
-          <button onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} className="w-full mt-6 text-[10px] font-black text-gray-400 uppercase italic">
-            {authMode === 'login' ? '¿Sos nuevo? Registrate acá' : 'Ya tengo cuenta, quiero entrar'}
+          <button 
+            onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')} 
+            className="w-full mt-6 text-[10px] font-black text-gray-400 uppercase italic underline"
+          >
+            {authMode === 'login' ? '¿NO TENÉS CUENTA? REGISTRATE' : 'YA TENGO CUENTA, VOLVER'}
           </button>
         </div>
       </div>
     );
   }
 
-  // SI HAY USUARIO, MOSTRAR LA APP
+  // --- CUERPO DE LA APLICACIÓN ---
   return (
-    <div className="max-w-4xl mx-auto bg-[#f2f2f7] min-h-screen pb-32 text-[#1c1c1e] font-sans">
-      <header className="px-6 pt-8 pb-4 flex justify-between items-end">
+    <div className="max-w-4xl mx-auto bg-slate-50 min-h-screen pb-32 text-slate-900">
+      <header className="px-6 pt-8 pb-4 flex justify-between items-end bg-white border-b border-slate-100">
         <div>
-          <p className="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1">
+          <p className="text-[9px] font-black text-blue-600 uppercase mb-1 tracking-tighter">
             {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).toUpperCase()}
           </p>
           <h1 className="text-2xl font-black italic uppercase tracking-tighter">PRECEPTOR <span className="text-blue-600">PRO</span></h1>
         </div>
-        <button onClick={() => signOut(auth)} className="text-[8px] font-black text-red-300 border border-red-50 px-3 py-1 rounded-full italic">SALIR</button>
+        <button onClick={() => signOut(auth)} className="text-[8px] font-black text-red-500 border border-red-100 px-3 py-1 rounded-full bg-red-50">SALIR</button>
       </header>
 
-      <main className="px-4">
+      <main className="p-4">
         {view === 'home' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center px-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic">Mis Cursos Personalizados</p>
+            <div className="flex justify-between items-center px-1">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest italic">CURSOS ACTIVOS</p>
                 <button onClick={() => {
                     const name = prompt("Nombre del nuevo curso (ej: 3ero C):");
                     if (name) {
                         const updated = { ...data, courses: [...data.courses, name], students: { ...data.students, [name]: [] } };
                         setData(updated); saveToCloud(updated);
                     }
-                }} className="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase">+ NUEVO</button>
+                }} className="bg-blue-600 text-white text-[9px] font-black px-3 py-1 rounded-full shadow-md">+ NUEVO</button>
             </div>
             {data.courses.map(c => (
-              <div key={c} className="relative group">
-                <div onClick={() => { setCourse(c); setView('course'); }} className={`p-8 rounded-[1.5rem] flex justify-between items-center shadow-md border-l-[10px] bg-white cursor-pointer active:scale-95 transition-all ${c.includes('A ') ? 'border-blue-400' : 'border-rose-400'}`}>
-                    <h2 className="text-2xl font-black italic uppercase tracking-tighter">{c}</h2>
-                    <span className="text-gray-300 text-xl font-bold">→</span>
+              <div key={c} className="relative">
+                <div onClick={() => { setCourse(c); setView('course'); }} className="p-8 rounded-3xl flex justify-between items-center shadow-sm border-l-8 border-blue-500 bg-white cursor-pointer active:scale-95 transition-all">
+                    <h2 className="text-xl font-black italic uppercase">{c}</h2>
+                    <span className="text-blue-500 text-xl font-bold">→</span>
                 </div>
                 <button onClick={(e) => {
                     e.stopPropagation();
-                    if(confirm("¿Borrar curso completo?")) {
+                    if(confirm("¿Borrar curso?")) {
                         const updated = { ...data, courses: data.courses.filter(x => x !== c) };
                         setData(updated); saveToCloud(updated);
                     }
-                }} className="absolute -top-2 -right-2 bg-white text-red-200 border border-red-50 w-6 h-6 rounded-full text-[10px] flex items-center justify-center font-black">X</button>
+                }} className="absolute top-1/2 -right-2 -translate-y-1/2 bg-red-50 text-red-400 border border-red-100 w-8 h-8 rounded-full text-xs flex items-center justify-center font-black">X</button>
               </div>
             ))}
           </div>
         )}
 
         {view === 'course' && (
-          <div className="animate-in slide-in-from-right duration-300">
-            <div className="flex items-center gap-4 mb-4">
-              <button onClick={() => setView('home')} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 font-bold border border-gray-100">←</button>
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <button onClick={() => setView('home')} className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600 font-bold border border-slate-200">←</button>
               <h2 className="text-xl font-black italic uppercase">{course}</h2>
             </div>
             
-            <div className="flex bg-gray-200/50 p-1 rounded-2xl mb-4 gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex bg-slate-200/50 p-1 rounded-2xl gap-1 overflow-x-auto">
               {['asis', 'list', 'edit'].map(v => (
-                <button key={v} onClick={() => setSubView(v)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${subView === v ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
+                <button key={v} onClick={() => setSubView(v)} className={`flex-1 py-3 rounded-xl text-[9px] font-black uppercase transition-all ${subView === v ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>
                   {v === 'asis' ? 'Asistencia' : v === 'list' ? 'Listas' : 'Alumnos'}
                 </button>
               ))}
@@ -204,36 +206,26 @@ export default function App() {
 
             {subView === 'asis' && (
               <div className="space-y-4">
-                <div className="flex bg-white p-1 rounded-xl gap-1 shadow-sm border border-gray-100">
+                <div className="flex bg-white p-1 rounded-xl gap-1 shadow-sm border border-slate-100">
                   {['day', 'week', 'month'].map(m => (
-                    <button key={m} onClick={() => setAsisMode(m)} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase ${asisMode === m ? 'bg-blue-600 text-white shadow-md' : 'text-gray-400'}`}>{m === 'day' ? 'Día' : m === 'week' ? 'Semana' : 'Mes'}</button>
+                    <button key={m} onClick={() => setAsisMode(m)} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase ${asisMode === m ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400'}`}>{m === 'day' ? 'Día' : m === 'week' ? 'Semana' : 'Mes'}</button>
                   ))}
                 </div>
 
-                <div className="flex justify-between items-center px-1">
-                   <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-xl shadow-sm border border-gray-100">
-                    <button onClick={() => { let d = new Date(currentDate); d.setDate(d.getDate()-1); setCurrentDate(d); }} className="text-blue-600 text-xl font-bold">‹</button>
-                    <input type="date" value={currentDate.toISOString().split('T')[0]} onChange={(e) => setCurrentDate(new Date(e.target.value + "T12:00:00"))} className="text-[10px] font-black uppercase text-blue-600 bg-transparent border-none outline-none" />
-                    <button onClick={() => { let d = new Date(currentDate); d.setDate(d.getDate()+1); setCurrentDate(d); }} className="text-blue-600 text-xl font-bold">›</button>
-                  </div>
+                <div className="flex justify-center">
+                    <input type="date" value={currentDate.toISOString().split('T')[0]} onChange={(e) => setCurrentDate(new Date(e.target.value + "T12:00:00"))} className="text-[10px] font-black uppercase text-blue-600 bg-white px-6 py-2 rounded-full border shadow-sm outline-none" />
                 </div>
 
                 {asisMode === 'day' ? (
-                  <div className="space-y-3 pb-10">
+                  <div className="space-y-3">
                     {studentList.map(s => {
                       const st = data.attendance[dateKey]?.[course]?.[s] || '';
                       return (
-                        <div key={s} className={`bg-white p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3 border shadow-sm transition-all ${st === 'S' ? 'border-red-600 bg-red-50' : 'border-gray-50'}`}>
-                          <div className="w-full text-[11px] font-black uppercase italic text-gray-700 leading-tight whitespace-pre-wrap flex-1">{s}</div>
-                          <div className="flex gap-1 w-full sm:w-auto justify-end">
+                        <div key={s} className={`bg-white p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-3 border shadow-sm ${st === 'S' ? 'border-red-600 bg-red-50' : 'border-slate-50'}`}>
+                          <div className="w-full text-[10px] font-black uppercase italic text-slate-700 leading-tight">{s}</div>
+                          <div className="flex gap-1">
                             {['P','A','J','ACAP','S'].map(opt => (
-                              <button key={opt} onClick={() => toggleAsis(s, opt)} className={`px-2 h-10 rounded-xl text-[9px] font-black border transition-all ${st === opt ? 
-                                (opt === 'P' ? 'bg-green-600 border-green-600 text-white' : 
-                                 opt === 'A' ? 'bg-red-500 border-red-500 text-white' : 
-                                 opt === 'J' ? 'bg-blue-600 border-blue-600 text-white' :
-                                 opt === 'ACAP' ? 'bg-amber-500 border-amber-500 text-white' : 
-                                 'bg-red-700 border-red-700 text-white font-black') 
-                                : 'bg-gray-50 text-gray-300 border-gray-100'}`}>
+                              <button key={opt} onClick={() => toggleAsis(s, opt)} className={`px-2 h-10 rounded-xl text-[9px] font-black border transition-all ${st === opt ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-50 text-slate-300 border-slate-100'}`}>
                                 {opt}
                               </button>
                             ))}
@@ -243,187 +235,180 @@ export default function App() {
                     })}
                   </div>
                 ) : (
-                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xl">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse text-[10px]">
-                        <thead className="bg-gray-50 font-black uppercase text-gray-400 border-b">
-                          <tr>
-                            <th className="sticky left-0 bg-gray-50 p-3 text-left min-w-[150px] z-20 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">Alumno</th>
+                  <div className="bg-white rounded-2xl border overflow-x-auto shadow-sm">
+                    <table className="w-full border-collapse text-[10px]">
+                      <thead className="bg-slate-50 font-black uppercase text-slate-400 border-b">
+                        <tr>
+                          <th className="sticky left-0 bg-slate-50 p-3 text-left min-w-[150px] z-10">Alumno</th>
+                          {asisMode === 'week' ? [0,1,2,3,4].map(i => {
+                            let d = new Date(currentDate); d.setDate(d.getDate() - d.getDay() + 1 + i);
+                            return <th key={i} className="p-3 text-center border-l">{d.getDate()}/{d.getMonth()+1}</th>;
+                          }) : Array.from({length: new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 0).getDate()}, (_,i)=>i+1).map(d => (
+                            <th key={d} className="p-2 text-center border-l">{d}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="font-bold uppercase">
+                        {studentList.map(s => (
+                          <tr key={s} className="border-b">
+                            <td className="sticky left-0 bg-white p-3 text-[9px] font-black">{s}</td>
                             {asisMode === 'week' ? [0,1,2,3,4].map(i => {
                               let d = new Date(currentDate); d.setDate(d.getDate() - d.getDay() + 1 + i);
-                              return <th key={i} className="p-3 text-center border-l min-w-[50px]">{d.getDate()}/{d.getMonth()+1}</th>;
-                            }) : Array.from({length: new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 0).getDate()}, (_,i)=>i+1).map(d => (
-                              <th key={d} className="p-2 text-center border-l min-w-[35px] font-black">{d}</th>
-                            ))}
+                              const v = data.attendance[d.toLocaleDateString('es-AR')]?.[course]?.[s] || '-';
+                              return <td key={i} className="p-3 text-center border-l font-black">{v}</td>;
+                            }) : Array.from({length: new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 0).getDate()}, (_,i)=>i+1).map(d => {
+                              const fullD = new Date(currentDate.getFullYear(), currentDate.getMonth(), d).toLocaleDateString('es-AR');
+                              const v = data.attendance[fullD]?.[course]?.[s] || '-';
+                              return <td key={d} className={`p-2 text-center border-l font-black ${v === 'A' ? 'text-red-500' : v === 'P' ? 'text-green-600' : ''}`}>{v}</td>;
+                            })}
                           </tr>
-                        </thead>
-                        <tbody className="font-bold uppercase">
-                          {studentList.map(s => (
-                            <tr key={s} className="border-b last:border-0">
-                              <td className="sticky left-0 bg-white p-3 z-10 shadow-[2px_0_5_rgba(0,0,0,0.05)] text-[9px] font-black leading-tight whitespace-pre-wrap">{s}</td>
-                              {asisMode === 'week' ? [0,1,2,3,4].map(i => {
-                                let d = new Date(currentDate); d.setDate(d.getDate() - d.getDay() + 1 + i);
-                                const v = data.attendance[d.toLocaleDateString('es-AR')]?.[course]?.[s] || '-';
-                                return <td key={i} className={`p-3 text-center border-l font-black ${v === 'A' ? 'text-red-500' : v === 'S' ? 'text-red-700' : v === 'P' ? 'text-green-600' : v === 'ACAP' ? 'text-amber-600' : ''}`}>{v}</td>;
-                              }) : Array.from({length: new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 0).getDate()}, (_,i)=>i+1).map(d => {
-                                const fullD = new Date(currentDate.getFullYear(), currentDate.getMonth(), d).toLocaleDateString('es-AR');
-                                const v = data.attendance[fullD]?.[course]?.[s] || '-';
-                                return <td key={d} className={`p-2 text-center border-l font-black ${v === 'A' ? 'text-red-500' : v === 'S' ? 'text-red-700 font-black' : v === 'P' ? 'text-green-600' : v === 'ACAP' ? 'text-amber-600' : ''}`}>{v}</td>;
-                              })}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
             )}
 
             {subView === 'edit' && (
-              <div className="bg-white p-6 rounded-3xl shadow-md border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 mb-4 uppercase italic tracking-widest text-center">Importar Nómina de Alumnos</p>
-                <textarea id="imp-box" className="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-4 outline-none focus:ring-2 ring-blue-100 transition-all" placeholder="Escribí un nombre por línea..."></textarea>
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                <p className="text-[10px] font-black text-slate-400 mb-4 uppercase italic text-center">Importar Alumnos (un nombre por línea)</p>
+                <textarea id="imp-box" className="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border-2 border-slate-50 h-40 mb-4 outline-none focus:border-blue-200" placeholder="01 PEREZ, JUAN..."></textarea>
                 <button onClick={() => {
                   const val = document.getElementById('imp-box').value;
                   const newList = val.split('\n').map(x => x.trim()).filter(x => x.length > 2);
                   const updated = { ...data, students: { ...data.students, [course]: newList } };
-                  setData(updated);
-                  saveToCloud(updated);
-                }} className="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-100">Guardar Nómina en la Nube</button>
+                  setData(updated); saveToCloud(updated);
+                }} className="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-lg">Sincronizar Alumnos</button>
               </div>
             )}
           </div>
         )}
 
-        {view === 'notes' && (
-          <div className="animate-in fade-in duration-300">
-            <h2 className="text-xl font-black italic uppercase mb-6 px-2">Bloc de Notas Cloud</h2>
-            <div className="bg-white p-6 rounded-3xl shadow-md border border-gray-100 mb-6">
-              <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} className="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-3 outline-none focus:ring-2 ring-blue-100 transition-all" placeholder="Escribí tu nota importante..."></textarea>
-              <div className="flex gap-2">
-                <button onClick={handleSaveNote} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-100">
-                  {editingNoteId ? 'Actualizar Nota' : 'Guardar en la Nube'}
-                </button>
-              </div>
+        {view === 'schedule' && (
+          <div className="space-y-8">
+            <h2 className="text-xl font-black italic uppercase mb-4 px-2">Grilla de Horarios</h2>
+            <div className="bg-white rounded-3xl border overflow-x-auto shadow-sm">
+              <table className="w-full text-center border-collapse text-[10px]">
+                <thead className="bg-slate-50 text-slate-400 font-black border-b uppercase">
+                  <tr>
+                    <th className="p-3 border-r min-w-[85px]">Hora</th>
+                    {["Lun", "Mar", "Mie", "Jue", "Vie"].map(d => <th key={d} className="p-3 border-r min-w-[110px]">{d}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {["12:30", "13:10", "13:50", "14:40", "15:20", "16:00", "16:50", "17:30"].map((h, i) => (
+                    <tr key={h} className="border-b last:border-0">
+                      <td className="p-1 bg-slate-50 font-black border-r">{h}</td>
+                      {[0,1,2,3,4].map(d => {
+                        const k = `${course}_${d}_${i}`;
+                        const val = data.schedule[k] || {m:'', p:''};
+                        return (
+                          <td key={d} className="p-1 border-r">
+                            <input value={val.m} onChange={(e) => {
+                              const newSch = {...data.schedule, [k]: {...val, m: e.target.value}};
+                              const updated = {...data, schedule: newSch};
+                              setData(updated); saveToCloud(updated);
+                            }} className="w-full text-center text-[9px] font-black text-blue-600 uppercase bg-transparent outline-none" placeholder="-" />
+                            <input value={val.p} onChange={(e) => {
+                              const newSch = {...data.schedule, [k]: {...val, p: e.target.value}};
+                              const updated = {...data, schedule: newSch};
+                              setData(updated); saveToCloud(updated);
+                            }} className="w-full text-center text-[7px] font-bold text-slate-400 uppercase bg-transparent outline-none" placeholder="-" />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="space-y-4 px-2">
+
+            <h2 className="text-xl font-black italic uppercase mb-4 px-2 text-blue-600">Contraturno</h2>
+            <div className="bg-white rounded-3xl border overflow-x-auto shadow-sm">
+              <table className="w-full text-center border-collapse text-[10px]">
+                <thead className="bg-blue-50 text-blue-400 font-black border-b uppercase">
+                  <tr>
+                    <th className="p-3 border-r min-w-[85px]">Hora</th>
+                    {["Lun", "Mar", "Mie", "Jue", "Vie"].map(d => <th key={d} className="p-3 border-r min-w-[110px]">{d}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[0,1,2].map((_, i) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="p-1 bg-slate-50 border-r">
+                        <input value={data.contraturno[`h_${course}_${i}`] || ""} onChange={(e) => {
+                          const updated = {...data, contraturno: {...data.contraturno, [`h_${course}_${i}`]: e.target.value}};
+                          setData(updated); saveToCloud(updated);
+                        }} className="w-full text-center bg-transparent outline-none font-black text-slate-600" placeholder="00:00" />
+                      </td>
+                      {[0,1,2,3,4].map(d => {
+                        const k = `c_${course}_${d}_${i}`;
+                        const val = data.contraturno[k] || {m:'', p:''};
+                        return (
+                          <td key={d} className="p-1 border-r">
+                            <input value={val.m} onChange={(e) => {
+                              const newSch = {...data.contraturno, [k]: {...val, m: e.target.value}};
+                              const updated = {...data, contraturno: newSch};
+                              setData(updated); saveToCloud(updated);
+                            }} className="w-full text-center text-[9px] font-black text-blue-600 uppercase bg-transparent outline-none" placeholder="-" />
+                            <input value={val.p} onChange={(e) => {
+                              const newSch = {...data.contraturno, [k]: {...val, p: e.target.value}};
+                              const updated = {...data, contraturno: newSch};
+                              setData(updated); saveToCloud(updated);
+                            }} className="w-full text-center text-[7px] font-bold text-slate-400 uppercase bg-transparent outline-none" placeholder="-" />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {view === 'notes' && (
+          <div className="space-y-6">
+            <h2 className="text-xl font-black italic uppercase mb-4 px-2">Notas Rápidas Cloud</h2>
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+              <textarea value={noteInput} onChange={(e) => setNoteInput(e.target.value)} className="w-full bg-slate-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-3 outline-none focus:ring-2 ring-blue-100" placeholder="Escribí acá..."></textarea>
+              <button onClick={() => {
+                if (!noteInput.trim()) return;
+                const newNotes = [...data.notes, { id: Date.now().toString(), t: noteInput, d: new Date().toLocaleString() }];
+                const updated = { ...data, notes: newNotes };
+                setData(updated); saveToCloud(updated); setNoteInput('');
+              }} className="w-full bg-blue-600 text-white py-3 rounded-xl text-[10px] font-black uppercase shadow-lg">Guardar Nota</button>
+            </div>
+            <div className="space-y-4">
               {data.notes.slice().reverse().map(n => (
-                <div key={n.id} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <p className="text-xs font-bold text-gray-700 mb-4 whitespace-pre-wrap">{n.t}</p>
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-50 text-[7px] font-black text-gray-400 uppercase italic">
+                <div key={n.id} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+                  <p className="text-xs font-bold text-slate-700 mb-4 whitespace-pre-wrap">{n.t}</p>
+                  <div className="flex justify-between items-center pt-4 border-t text-[7px] font-black text-slate-400">
                     <span>{n.d}</span>
-                    <button onClick={() => { if(confirm("¿Borrar?")) {
+                    <button onClick={() => { if(confirm("¿Borrar nota?")) {
                         const updated = { ...data, notes: data.notes.filter(x => x.id !== n.id) };
                         setData(updated); saveToCloud(updated);
-                    } }} className="text-red-300">BORRAR</button>
+                    } }} className="text-red-300 uppercase">BORRAR</button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-
-        {view === 'schedule' && (
-          <div className="animate-in slide-in-from-bottom duration-300 space-y-8">
-            <h2 className="text-xl font-black italic uppercase mb-4 px-2 tracking-tighter">Horarios Cloud</h2>
-            <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-center border-collapse text-[10px]">
-                  <thead className="bg-gray-50 text-gray-400 font-black border-b uppercase">
-                    <tr>
-                      <th className="p-3 border-r min-w-[85px]">Hora</th>
-                      {["Lun", "Mar", "Mie", "Jue", "Vie"].map(d => <th key={d} className="p-3 border-r min-w-[110px]">{d}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {["12:30", "13:10", "13:50", "14:40", "15:20", "16:00", "16:50", "17:30"].map((h, i) => (
-                      <tr key={h} className="border-b last:border-0">
-                        <td className="p-1 bg-gray-50 font-black border-r">{h}</td>
-                        {[0,1,2,3,4].map(d => {
-                          const k = `${course}_${d}_${i}`;
-                          const val = data.schedule[k] || {m:'', p:''};
-                          return (
-                            <td key={d} className="p-1 border-r">
-                              <input value={val.m} onChange={(e) => {
-                                const newSch = {...data.schedule, [k]: {...val, m: e.target.value}};
-                                const updated = {...data, schedule: newSch};
-                                setData(updated); saveToCloud(updated);
-                              }} className="w-full text-center text-[9px] font-black text-blue-600 uppercase bg-transparent outline-none" placeholder="-" />
-                              <input value={val.p} onChange={(e) => {
-                                const newSch = {...data.schedule, [k]: {...val, p: e.target.value}};
-                                const updated = {...data, schedule: newSch};
-                                setData(updated); saveToCloud(updated);
-                              }} className="w-full text-center text-[7px] font-bold text-gray-400 uppercase bg-transparent outline-none" placeholder="-" />
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* CONTRATURNO */}
-            <h2 className="text-xl font-black italic uppercase mb-4 px-2 tracking-tighter text-blue-600">Contraturno</h2>
-            <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-xl">
-              <div className="overflow-x-auto">
-                <table className="w-full text-center border-collapse text-[10px]">
-                  <thead className="bg-blue-50 text-blue-400 font-black border-b uppercase">
-                    <tr>
-                      <th className="p-3 border-r min-w-[85px]">Hora</th>
-                      {["Lun", "Mar", "Mie", "Jue", "Vie"].map(d => <th key={d} className="p-3 border-r min-w-[110px]">{d}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[0,1,2].map((_, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="p-1 bg-gray-50 border-r">
-                          <input value={data.contraturno[`h_${course}_${i}`] || ""} onChange={(e) => {
-                            const updated = {...data, contraturno: {...data.contraturno, [`h_${course}_${i}`]: e.target.value}};
-                            setData(updated); saveToCloud(updated);
-                          }} className="w-full text-center bg-transparent outline-none font-black text-gray-600" placeholder="00:00" />
-                        </td>
-                        {[0,1,2,3,4].map(d => {
-                          const k = `c_${course}_${d}_${i}`;
-                          const val = data.contraturno[k] || {m:'', p:''};
-                          return (
-                            <td key={d} className="p-1 border-r">
-                              <input value={val.m} onChange={(e) => {
-                                const newSch = {...data.contraturno, [k]: {...val, m: e.target.value}};
-                                const updated = {...data, contraturno: newSch};
-                                setData(updated); saveToCloud(updated);
-                              }} className="w-full text-center text-[9px] font-black text-blue-600 uppercase bg-transparent outline-none" placeholder="-" />
-                              <input value={val.p} onChange={(e) => {
-                                const newSch = {...data.contraturno, [k]: {...val, p: e.target.value}};
-                                const updated = {...data, contraturno: newSch};
-                                setData(updated); saveToCloud(updated);
-                              }} className="w-full text-center text-[7px] font-bold text-gray-400 uppercase bg-transparent outline-none" placeholder="-" />
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-md bg-white/80 backdrop-blur-xl rounded-[2.2rem] p-2 flex justify-around shadow-2xl border border-white/40 z-50">
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm bg-white/90 backdrop-blur-md rounded-full p-2 flex justify-around shadow-2xl border border-slate-200 z-50">
         {[
-          { id: 'home', icon: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z', label: 'Cursos' },
-          { id: 'schedule', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Horarios', isOutline: true },
-          { id: 'notes', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', label: 'Notas', isOutline: true }
+          { id: 'home', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Inicio' },
+          { id: 'schedule', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', label: 'Horarios' },
+          { id: 'notes', icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z', label: 'Notas' }
         ].map(n => (
-          <button key={n.id} onClick={() => setView(n.id)} className={`flex flex-col items-center p-3 transition-all ${view === n.id ? 'text-blue-600 scale-110' : 'text-gray-400'}`}>
-            <svg className="w-6 h-6" fill={n.isOutline ? 'none' : 'currentColor'} stroke="currentColor" strokeWidth={n.isOutline ? "2.5" : "0"} viewBox="0 0 24 24">
+          <button key={n.id} onClick={() => setView(n.id)} className={`flex flex-col items-center p-2 transition-all ${view === n.id ? 'text-blue-600 scale-110' : 'text-slate-400'}`}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                 <path d={n.icon} strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="text-[8px] font-black uppercase mt-1">{n.label}</span>
+            <span className="text-[7px] font-black uppercase mt-1">{n.label}</span>
           </button>
         ))}
       </nav>
