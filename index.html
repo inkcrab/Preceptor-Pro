@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v27.0 - Smart ACAP</title>
+    <title>Preceptor Pro v27.1 - Smart ACAP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
@@ -31,7 +31,6 @@
         
         .asis-btn { height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
         
-        /* Estilo para resaltar ACAP en la lista */
         .acap-highlight { background-color: #fffbeb !important; border: 2px solid #fbbf24 !important; border-left-width: 12px !important; transform: scale(1.02); z-index: 5; }
         .acap-badge { background: #fbbf24; color: #78350f; font-size: 7px; font-weight: 900; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; margin-bottom: 2px; display: inline-block; }
     </style>
@@ -43,7 +42,7 @@
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
                 <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-white bg-green-600 px-2 py-1 rounded">V27.0 MASTER</div>
+            <div class="text-[9px] font-bold text-white bg-blue-600 px-2 py-1 rounded">V27.1</div>
         </header>
 
         <div id="alerts" class="px-6 mb-4 space-y-2"></div>
@@ -71,7 +70,7 @@
     </div>
 
     <script>
-        const KEY = 'prec_v26_master_omar'; // Mantenemos la key para no borrar datos previos
+        const KEY = 'prec_v26_master_omar'; 
         const HORARIOS = ["12:30 a 13:10", "13:10 a 13:50", "13:50 a 14:30", "14:40 a 15:20", "15:20 a 16:00", "16:00 a 16:40", "16:50 a 17:30", "17:30 a 18:10"];
         const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
@@ -182,7 +181,6 @@
             const dateStr = db.date.toLocaleDateString();
 
             if(db.sub === 'asis') {
-                // Lógica de detección de ACAP para el día seleccionado
                 const studentsInAcapToday = list.filter(s => {
                     const acData = db.acap[dateStr]?.[db.course]?.[s];
                     return acData && (acData.h || acData.l);
@@ -227,7 +225,6 @@
 
                     return header + `<div class="space-y-2 pb-24">` + list.map(s => {
                         const val = dia[s] || '';
-                        // Verificamos si este alumno tiene info en ACAP para ESTE día
                         const acInfo = db.acap[dateStr]?.[db.course]?.[s];
                         const hasAcap = acInfo && (acInfo.h || acInfo.l);
                         
@@ -304,17 +301,48 @@
             if(db.sub === 'list') {
                 return `<div class="card p-3 mb-4 flex gap-2">${db.checklistLabels.map((l,i) => `<input onchange="db.checklistLabels[${i}]=this.value;save()" class="flex-1 bg-gray-100 p-2 text-[8px] font-black uppercase text-center rounded-lg border-none" value="${l}">`).join('')}</div>
                 <div class="space-y-2 pb-24">` + list.map(s => {
-                    const ck = db.checklists[`${db.course}_${s}`] || [false, false, false];
+                    const ck = db.checklists[`${db.course}_s`] || [false, false, false];
                     return `<div class="card p-4 flex justify-between items-center px-6"><span class="student-name-full" style="font-size:10px">${s}</span><div class="flex gap-6">${ck.map((v, i) => `<input type="checkbox" ${v?'checked':''} onchange="toggleCk('${s}',${i})" class="w-5 h-5">`).join('')}</div></div>`;
                 }).join('') + `</div>`;
             }
 
             if(db.sub === 'edit') {
-                return `<div class="card p-6">
-                    <p class="text-[10px] font-black text-gray-400 mb-4 uppercase italic">Importar Lista de Alumnos</p>
-                    <textarea id="imp-box" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-4" placeholder="Copia y pega la lista..."></textarea>
-                    <button onclick="impS()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase">Guardar Lista</button>
+                return `
+                <div class="space-y-4 pb-24">
+                    <div class="card p-6">
+                        <p class="text-[10px] font-black text-gray-400 mb-4 uppercase italic">Alumnos en este curso</p>
+                        <div class="space-y-2 mb-6">
+                            ${list.map(s => `
+                                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <span class="text-[10px] font-black uppercase tracking-tighter">${s}</span>
+                                    <button onclick="delStudent('${s}')" class="text-red-500 text-[9px] font-black uppercase bg-white px-3 py-1.5 rounded-lg shadow-sm border border-red-50">Borrar</button>
+                                </div>`).join('')}
+                            ${list.length === 0 ? '<p class="text-center text-gray-300 font-black text-[9px] py-4 uppercase italic">No hay alumnos registrados</p>' : ''}
+                        </div>
+                        <button onclick="clearCourse()" class="w-full bg-red-50 text-red-600 py-3 rounded-xl text-[9px] font-black uppercase mb-4 border border-red-100">Limpiar Lista Completa</button>
+                    </div>
+
+                    <div class="card p-6">
+                        <p class="text-[10px] font-black text-gray-400 mb-4 uppercase italic">Importar / Agregar Lista Nueva</p>
+                        <p class="text-[8px] font-bold text-gray-400 mb-2 leading-tight uppercase">Copia y pega la lista de alumnos (uno por línea). Esto reemplazará la lista actual.</p>
+                        <textarea id="imp-box" class="w-full bg-gray-50 p-4 rounded-xl text-xs font-bold border-none h-40 mb-4" placeholder="01 ALVAREZ&#10;02 BENITEZ..."></textarea>
+                        <button onclick="impS()" class="w-full bg-blue-600 text-white py-4 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-blue-100">Guardar Lista</button>
+                    </div>
                 </div>`;
+            }
+        }
+
+        function delStudent(s) {
+            if(confirm(`¿Borrar a ${s}?`)) {
+                db.students[db.course] = db.students[db.course].filter(name => name !== s);
+                render();
+            }
+        }
+
+        function clearCourse() {
+            if(confirm("¿Estás seguro de que querés borrar TODOS los alumnos de este curso?")) {
+                db.students[db.course] = [];
+                render();
             }
         }
 
@@ -418,19 +446,15 @@
         function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
         function toggleCk(s, i) { const k = `${db.course}_${s}`; if(!db.checklists[k]) db.checklists[k]=[false,false,false]; db.checklists[k][i] = !db.checklists[k][i]; save(); }
         
-        // Función de guardado de ACAP mejorada
         function saveAc(s, f, v) { 
             const dk = db.date.toLocaleDateString(); 
             if(!db.acap[dk]) db.acap[dk]={}; 
             if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; 
             if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; 
             db.acap[dk][db.course][s][f] = v; 
-            
-            // Si el campo se vacía por completo, podemos borrarlo para ahorrar espacio
             if(!db.acap[dk][db.course][s].h && !db.acap[dk][db.course][s].l) {
                 delete db.acap[dk][db.course][s];
             }
-            
             save(); 
         }
 
@@ -438,5 +462,6 @@
     </script>
 </body>
 </html>
+
 
 ```
