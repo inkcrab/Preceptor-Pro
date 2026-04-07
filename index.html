@@ -3,25 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Preceptor Pro v26.2</title>
+    <title>Preceptor Pro v27.0 - Smart ACAP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         :root { --ios-bg: #f2f2f7; --accent: #2563eb; }
         body { font-family: 'Inter', sans-serif; background-color: var(--ios-bg); color: #1c1c1e; -webkit-font-smoothing: antialiased; }
         .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
-        .card { background: white; border-radius: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.05); }
+        .card { background: white; border-radius: 1.2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid rgba(0,0,0,0.05); transition: all 0.3s ease; }
         
-        /* Colores por curso */
         .bg-5a-boea { background-color: #f3f0ff !important; border-left: 8px solid #a78bfa !important; }
         .bg-5b-boea { background-color: #fff1f2 !important; border-left: 8px solid #9f1239 !important; }
         .bg-5a-boi { background-color: #f0f9ff !important; border-left: 8px solid #0ea5e9 !important; }
         
-        /* Botones de navegación interna */
         .tab-btn { font-size: 10px; font-weight: 800; text-transform: uppercase; padding: 12px 6px; border-radius: 10px; flex: 1; text-align: center; transition: 0.2s; }
         .tab-btn.active { background: white; color: var(--accent); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
         
-        /* Tablas */
         .monthly-scroll-container { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; border-radius: 12px; background: white; }
         .monthly-table { border-collapse: collapse; width: 100%; font-size: 11px; }
         .monthly-table th, .monthly-table td { border: 1px solid #f0f0f0; padding: 8px 4px; text-align: center; min-width: 38px; }
@@ -30,10 +27,13 @@
         .schedule-grid { display: grid; grid-template-columns: 100px repeat(5, 1fr); gap: 1px; background: #e5e7eb; }
         .schedule-cell { background: white; padding: 6px; text-align: center; font-size: 10px; min-height: 60px; display: flex; flex-direction: column; justify-content: center; border: 0.5px solid #f0f0f0; }
 
-        .student-name-full { font-weight: 900; font-size: 10.5px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 4px; line-height: 1.1; overflow: hidden; text-overflow: ellipsis; }
+        .student-name-full { font-weight: 900; font-size: 10.5px; text-transform: uppercase; font-style: italic; color: #374151; flex: 1; padding-right: 4px; line-height: 1.1; }
         
-        /* Estilo específico para botones de asistencia para que no se corten */
-        .asis-btn { px-1; height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
+        .asis-btn { height: 32px; border-radius: 8px; font-weight: 900; font-size: 8px; border: 1px solid; min-width: 26px; flex-shrink: 0; }
+        
+        /* Estilo para resaltar ACAP en la lista */
+        .acap-highlight { background-color: #fffbeb !important; border: 2px solid #fbbf24 !important; border-left-width: 12px !important; transform: scale(1.02); z-index: 5; }
+        .acap-badge { background: #fbbf24; color: #78350f; font-size: 7px; font-weight: 900; padding: 1px 4px; border-radius: 4px; text-transform: uppercase; margin-bottom: 2px; display: inline-block; }
     </style>
 </head>
 <body class="pb-32">
@@ -43,7 +43,7 @@
                 <p id="top-date" class="text-[10px] font-black text-blue-600 uppercase tracking-tighter mb-1"></p>
                 <h1 class="text-2xl font-black italic tracking-tighter uppercase leading-none">PRECEPTOR <span class="text-blue-600">PRO</span></h1>
             </div>
-            <div class="text-[9px] font-bold text-white bg-red-600 px-2 py-1 rounded animate-pulse">V26.2 ACTUALIZADO</div>
+            <div class="text-[9px] font-bold text-white bg-green-600 px-2 py-1 rounded">V27.0 MASTER</div>
         </header>
 
         <div id="alerts" class="px-6 mb-4 space-y-2"></div>
@@ -71,7 +71,7 @@
     </div>
 
     <script>
-        const KEY = 'prec_v26_master_omar';
+        const KEY = 'prec_v26_master_omar'; // Mantenemos la key para no borrar datos previos
         const HORARIOS = ["12:30 a 13:10", "13:10 a 13:50", "13:50 a 14:30", "14:40 a 15:20", "15:20 a 16:00", "16:00 a 16:40", "16:50 a 17:30", "17:30 a 18:10"];
         const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"];
 
@@ -174,7 +174,7 @@
                     <button onclick="db.sub='list';render()" class="tab-btn ${db.sub==='list'?'active':'inactive'}">Listas</button>
                     <button onclick="db.sub='edit';render()" class="tab-btn ${db.sub==='edit'?'active':'inactive'}">Editar</button>
                 </div>
-                <div>${renderCourseDetail()}</div>`;
+                <div id="course-content">${renderCourseDetail()}</div>`;
         }
 
         function renderCourseDetail() {
@@ -182,7 +182,27 @@
             const dateStr = db.date.toLocaleDateString();
 
             if(db.sub === 'asis') {
-                let header = `
+                // Lógica de detección de ACAP para el día seleccionado
+                const studentsInAcapToday = list.filter(s => {
+                    const acData = db.acap[dateStr]?.[db.course]?.[s];
+                    return acData && (acData.h || acData.l);
+                });
+
+                let acapAlert = '';
+                if(studentsInAcapToday.length > 0 && db.asisMode === 'day') {
+                    acapAlert = `
+                    <div class="bg-amber-100 border-2 border-amber-400 p-3 rounded-2xl mb-4 flex items-center gap-3 animate-pulse">
+                        <span class="text-xl">💼</span>
+                        <div>
+                            <p class="text-[8px] font-black text-amber-800 uppercase">Aviso de ACAP hoy</p>
+                            <p class="text-[10px] font-bold text-amber-900 leading-tight">
+                                ${studentsInAcapToday.length} alumno(s) registrados en ACAP.
+                            </p>
+                        </div>
+                    </div>`;
+                }
+
+                let header = acapAlert + `
                 <div class="flex bg-white p-1 rounded-xl mb-4 gap-1 shadow-sm border border-gray-100">
                     <button onclick="db.asisMode='day';render()" class="tab-btn ${db.asisMode==='day'?'bg-blue-600 text-white':'text-gray-400'}">Día</button>
                     <button onclick="db.asisMode='week';render()" class="tab-btn ${db.asisMode==='week'?'bg-blue-600 text-white':'text-gray-400'}">Semana</button>
@@ -204,10 +224,19 @@
                     if(!db.attendance[dateStr]) db.attendance[dateStr] = {};
                     if(!db.attendance[dateStr][db.course]) db.attendance[dateStr][db.course] = {};
                     const dia = db.attendance[dateStr][db.course];
+
                     return header + `<div class="space-y-2 pb-24">` + list.map(s => {
                         const val = dia[s] || '';
-                        return `<div class="card p-3 flex justify-between items-center gap-2 ${val==='ACAP'?'bg-amber-50 border-l-4 border-amber-400':''}">
-                            <div class="student-name-full">${s}</div>
+                        // Verificamos si este alumno tiene info en ACAP para ESTE día
+                        const acInfo = db.acap[dateStr]?.[db.course]?.[s];
+                        const hasAcap = acInfo && (acInfo.h || acInfo.l);
+                        
+                        return `
+                        <div class="card p-3 flex justify-between items-center gap-2 ${hasAcap ? 'acap-highlight' : (val==='ACAP'?'bg-amber-50 border-l-4 border-amber-400':'')}">
+                            <div class="flex flex-col">
+                                ${hasAcap ? `<span class="acap-badge">ACAP: ${acInfo.h || ''} en ${acInfo.l || 'ver ACAP'}</span>` : ''}
+                                <div class="student-name-full">${s}</div>
+                            </div>
                             <div class="flex gap-1 shrink-0">
                                 ${['P','A','J','S','ACAP'].map(o => `
                                     <button onclick="toggleAsis('${s}','${o}')" class="asis-btn ${val===o?getCol(o):'bg-gray-50 text-gray-300 border-gray-100'}">
@@ -225,7 +254,9 @@
                         <thead class="bg-gray-50 uppercase text-[8px]"><tr><th class="sticky-col">Alumno</th>${week.map(d => `<th>${d.split('/')[0]}/${d.split('/')[1]}</th>`).join('')}</tr></thead>
                         <tbody class="uppercase font-bold text-[9px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${week.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''}"><b>${v}</b></td>`;
+                            const hasAc = db.acap[d]?.[db.course]?.[s];
+                            const cellStyle = hasAc ? 'bg-amber-100' : '';
+                            return `<td class="${v==='A'?'text-red-500':v==='P'?'text-green-600':v==='S'?'text-orange-500':''} ${cellStyle}"><b>${v}</b></td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
                 }
@@ -238,7 +269,8 @@
                         <thead class="bg-gray-100 uppercase text-[7px] font-black"><tr><th class="sticky-col">Alumno</th>${dates.map(d => `<th>${d.split('/')[0]}</th>`).join('')}</tr></thead>
                         <tbody class="uppercase font-bold text-[8px]">${list.map(s => `<tr><td class="sticky-col">${s}</td>${dates.map(d => {
                             const v = db.attendance[d]?.[db.course]?.[s] || '-';
-                            const color = v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='S'?'bg-orange-50 text-orange-500':v==='ACAP'?'bg-amber-100 text-amber-700':'';
+                            const hasAc = db.acap[d]?.[db.course]?.[s];
+                            const color = hasAc ? 'bg-amber-200 text-amber-800' : (v==='A'?'bg-red-50 text-red-500':v==='P'?'text-green-600':v==='S'?'bg-orange-50 text-orange-500':v==='ACAP'?'bg-amber-100 text-amber-700':'');
                             return `<td class="${color}">${v}</td>`;
                         }).join('')}</tr>`).join('')}</tbody>
                     </table></div>`;
@@ -246,16 +278,24 @@
             }
 
             if(db.sub === 'acap') {
-                if(!db.acap[dateStr]) db.acap[dateStr] = {};
-                if(!db.acap[dateStr][db.course]) db.acap[dateStr][db.course] = {};
-                const ac = db.acap[dateStr][db.course];
-                return `<div class="space-y-3 pb-24">` + list.map(s => {
+                return `
+                <div class="bg-blue-50 p-4 rounded-2xl mb-4 border border-blue-100">
+                    <p class="text-[10px] font-black text-blue-700 uppercase mb-1 italic underline">Cómo funciona:</p>
+                    <p class="text-[9px] font-bold text-blue-900 leading-tight">Lo que cargues aquí para el <b>${dateStr}</b> marcará automáticamente al alumno en la lista de asistencia de este día.</p>
+                </div>
+                <div class="space-y-3 pb-24">` + list.map(s => {
+                    if(!db.acap[dateStr]) db.acap[dateStr] = {};
+                    if(!db.acap[dateStr][db.course]) db.acap[dateStr][db.course] = {};
+                    const ac = db.acap[dateStr][db.course];
                     const d = ac[s] || {h:'', l:''};
                     return `<div class="card p-4">
-                        <p class="text-[10px] font-black uppercase text-amber-600 mb-2">${s}</p>
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-[10px] font-black uppercase text-amber-600">${s}</p>
+                            ${(d.h || d.l) ? '<span class="text-[7px] font-black bg-green-500 text-white px-2 py-0.5 rounded-full">CARGADO</span>' : ''}
+                        </div>
                         <div class="flex gap-2">
-                            <input onchange="saveAc('${s}','h',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Horario" value="${d.h}">
-                            <input onchange="saveAc('${s}','l',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Lugar" value="${d.l}">
+                            <input onchange="saveAc('${s}','h',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Horario (ej: 14 a 16)" value="${d.h}">
+                            <input onchange="saveAc('${s}','l',this.value)" class="flex-1 bg-gray-50 p-3 rounded-xl text-[10px] font-bold border-none" placeholder="Lugar / Empresa" value="${d.l}">
                         </div>
                     </div>`;
                 }).join('') + `</div>`;
@@ -377,7 +417,22 @@
 
         function impS() { const v = document.getElementById('imp-box').value; if(!v) return; db.students[db.course] = v.split('\n').map(x => x.trim()).filter(x => x.length>2); render(); }
         function toggleCk(s, i) { const k = `${db.course}_${s}`; if(!db.checklists[k]) db.checklists[k]=[false,false,false]; db.checklists[k][i] = !db.checklists[k][i]; save(); }
-        function saveAc(s, f, v) { const dk = db.date.toLocaleDateString(); if(!db.acap[dk]) db.acap[dk]={}; if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; db.acap[dk][db.course][s][f] = v; save(); }
+        
+        // Función de guardado de ACAP mejorada
+        function saveAc(s, f, v) { 
+            const dk = db.date.toLocaleDateString(); 
+            if(!db.acap[dk]) db.acap[dk]={}; 
+            if(!db.acap[dk][db.course]) db.acap[dk][db.course]={}; 
+            if(!db.acap[dk][db.course][s]) db.acap[dk][db.course][s] = {h:'', l:''}; 
+            db.acap[dk][db.course][s][f] = v; 
+            
+            // Si el campo se vacía por completo, podemos borrarlo para ahorrar espacio
+            if(!db.acap[dk][db.course][s].h && !db.acap[dk][db.course][s].l) {
+                delete db.acap[dk][db.course][s];
+            }
+            
+            save(); 
+        }
 
         window.onload = () => { load(); render(); };
     </script>
