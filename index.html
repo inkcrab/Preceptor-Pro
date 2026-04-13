@@ -52,6 +52,11 @@
   .asist-btn.active-J{background:#2980b9;border-color:#2980b9;color:#fff;}
   .asist-btn.active-S{background:#1a1a2e;border-color:#1a1a2e;color:#fff;}
   .asist-btn.active-AC{background:#e67e22;border-color:#e67e22;color:#fff;}
+  .asist-btn.active-T{background:#8e44ad;border-color:#8e44ad;color:#fff;}
+  /* Expandable asist row */
+  .asist-expand{display:none;flex-wrap:wrap;gap:6px;padding:10px 0 4px;}
+  .asist-expand.open{display:flex;}
+  .asist-main-btn{padding:8px 14px;border-radius:10px;border:2px solid #e0e0e0;background:#fff;font-weight:800;font-size:13px;color:#888;}
   /* Back btn */
   .back-btn{background:#fff;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.1);flex-shrink:0;}
   /* Scrollable table */
@@ -150,6 +155,8 @@ let state = {
   cursoTab: 'asistencia',
   fechaAsist: toISO(new Date()),
   vistaAsist: 'dia',
+  _listaActiva: null,
+  _listaCols: ['','',''],
   // Modals
   modal: null,
   modalData: {},
@@ -294,15 +301,17 @@ function buildHome(){
 
   let cursosHtml = state.cursos.map(c=>{
     const als = state.alumnos[c.id]||[];
-    const presentes = als.filter(a=>{const e=getAsist(c.id,a.id,hoy);return e==='P'||e==='AC';}).length;
+    const presentes = als.filter(a=>{const e=getAsist(c.id,a.id,hoy);return e==='P'||e==='AC'||e==='T';}).length;
+    const ausentes = als.filter(a=>getAsist(c.id,a.id,hoy)==='A').length;
     return `<div class="card" style="border-left:5px solid ${c.color};cursor:pointer" onclick="goCurso('${c.id}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div><div style="font-weight:800;font-size:17px;color:var(--primary)">${esc(c.nombre)}</div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:.5px">${esc(c.orientacion)}</div></div>
         <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
-      <div style="display:flex;gap:16px">
-        <div style="background:#f4f6fb;border-radius:10px;padding:8px 16px;text-align:center"><div style="font-size:11px;color:#888;font-weight:600">ALUMNOS</div><div style="font-size:22px;font-weight:900;color:var(--primary)">${als.length}</div></div>
-        <div style="background:#f4f6fb;border-radius:10px;padding:8px 16px;text-align:center"><div style="font-size:11px;color:#888;font-weight:600">PRESENTES</div><div style="font-size:22px;font-weight:900;color:#27ae60">${presentes}</div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="background:#f4f6fb;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:10px;color:#888;font-weight:600">ALUMNOS</div><div style="font-size:22px;font-weight:900;color:var(--primary)">${als.length}</div></div>
+        <div style="background:#f0fff4;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:10px;color:#27ae60;font-weight:600">PRESENTES</div><div style="font-size:22px;font-weight:900;color:#27ae60">${presentes}</div></div>
+        <div style="background:#fff5f5;border-radius:10px;padding:8px 14px;text-align:center"><div style="font-size:10px;color:#e74c3c;font-weight:600">AUSENTES</div><div style="font-size:22px;font-weight:900;color:#e74c3c">${ausentes}</div></div>
       </div>
     </div>`;
   }).join('');
@@ -382,37 +391,53 @@ function buildAsistencia(c){
 
 function buildVistaDia(c, als, fecha){
   const alsOrd = [...als].sort((a,b)=>a.nombre.localeCompare(b.nombre));
-  const estados = ['P','A','J','S','AC'];
-  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',AC:'#e67e22'};
+  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',T:'#8e44ad',AC:'#e67e22'};
+  const labels = {P:'Presente',A:'Ausente',J:'Justificado',S:'Suspendido',T:'Tarde',AC:'ACAP'};
 
   let rows = alsOrd.map((a,i)=>{
     const acap = getAcap(c.id,a.id,fecha);
+    const cur = getAsist(c.id,a.id,fecha);
     const bg = acap ? '#fff8e1' : '#fff';
     const border = acap ? '1px solid #f39c12' : '1px solid transparent';
-    const btns = estados.map(e=>{
-      const cur = getAsist(c.id,a.id,fecha);
-      const active = cur===e ? `active-${e}` : '';
-      return `<button class="asist-btn ${active}" onclick="toggleAsist('${c.id}','${a.id}','${fecha}','${e}')">${e}</button>`;
+    const col = cur ? colores[cur]||'#888' : '#ccc';
+    const estadoLabel = cur ? labels[cur]||cur : '—';
+    const rowId = `row_${c.id}_${a.id}`;
+    // Expandable buttons
+    const btns = ['P','A','J','S','T','AC'].map(e=>{
+      const isActive = cur===e;
+      return `<button class="asist-btn ${isActive?'active-'+e:''}" onclick="toggleAsist('${c.id}','${a.id}','${fecha}','${e}');toggleAsistRow('${rowId}')" title="${labels[e]}">${e}</button>`;
     }).join('');
-    return `<div style="background:${bg};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${border}">
+    return `<div id="${rowId}" style="background:${bg};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${border}">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <div>
+        <div style="flex:1;min-width:0">
           <span style="font-weight:700;font-size:13px;color:${acap?'#e67e22':'var(--primary)'}">${i+1}. ${esc(a.nombre)}</span>
           ${acap?`<div style="font-size:11px;color:#e67e22">💼 ACAP: ${esc(acap.empresa||'')} ${esc(acap.horario||'')}</div>`:''}
         </div>
-        <div style="display:flex;gap:5px">${btns}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${cur?`<span style="font-size:12px;font-weight:800;color:${col};background:${col}18;border-radius:8px;padding:4px 10px">${estadoLabel}</span>`:''}
+          <button onclick="toggleAsistRow('${rowId}')" style="background:${cur?col:'#f0f0f0'};border:none;border-radius:10px;padding:6px 12px;font-weight:800;font-size:13px;color:${cur?'#fff':'#888'};min-width:44px">
+            ${cur||'·'}
+          </button>
+        </div>
+      </div>
+      <div class="asist-expand" id="exp_${rowId}">
+        ${btns}
+        ${cur?`<button onclick="toggleAsist('${c.id}','${a.id}','${fecha}',null);toggleAsistRow('${rowId}')" style="padding:6px 12px;border-radius:9px;border:1.5px solid #e0e0e0;background:#fff;font-size:11px;font-weight:700;color:#999">Limpiar</button>`:''}
       </div>
     </div>`;
   }).join('');
 
   return `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div style="font-size:12px;color:#888;font-weight:600">ORDENADO A→Z</div>
+      <div style="font-size:11px;color:#888;font-weight:600">Tocá el botón para marcar</div>
       <div style="display:flex;align-items:center;gap:6px">
         <button onclick="setFechaAsist('${addDays(fecha,-1)}')" style="background:#fff;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)">${ICONS.chevL}</button>
         <span style="font-size:13px;font-weight:700;color:var(--primary);min-width:90px;text-align:center">${p2(isoToDate(fecha).getDate())}/${p2(isoToDate(fecha).getMonth()+1)}/${isoToDate(fecha).getFullYear()}</span>
         <button onclick="setFechaAsist('${addDays(fecha,1)}')" style="background:#fff;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)">${ICONS.chevR}</button>
       </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      ${Object.entries(colores).map(([k,v])=>`<span style="font-size:11px;font-weight:700;color:${v};background:${v}18;border-radius:6px;padding:3px 8px">${k}=${labels[k]}</span>`).join('')}
     </div>
     ${rows}`;
 }
@@ -420,7 +445,7 @@ function buildVistaDia(c, als, fecha){
 function buildVistaSemana(c, als, fecha){
   const lunes = startOfWeek(fecha);
   const dias = Array.from({length:5},(_,i)=>addDays(lunes,i));
-  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',AC:'#e67e22'};
+  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',T:'#8e44ad',AC:'#e67e22'};
   const alsOrd = [...als].sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const hoy = todayISO();
 
@@ -448,7 +473,7 @@ function buildVistaMes(c, als, fecha){
   const d = isoToDate(fecha);
   const y = d.getFullYear(), m = d.getMonth();
   const dias = daysInMonth(y,m);
-  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',AC:'#e67e22'};
+  const colores = {P:'#27ae60',A:'#e74c3c',J:'#2980b9',S:'#1a1a2e',T:'#8e44ad',AC:'#e67e22'};
   const alsOrd = [...als].sort((a,b)=>a.nombre.localeCompare(b.nombre));
   const hoy = todayISO();
 
@@ -475,22 +500,23 @@ function buildVistaMes(c, als, fecha){
     <div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
 }
 
-// ---- ACAP TAB ----
 function buildAcap(c){
   const als = state.alumnos[c.id]||[];
-  const fecha = state.modal==='acapFecha' ? state.modalData.fecha : (state._acapFecha||todayISO());
+  const f = state._acapFecha||todayISO();
   if(!state._acapFecha) state._acapFecha = todayISO();
-  const f = state._acapFecha;
 
   const rows = als.map((a,i)=>{
     const acap = getAcap(c.id,a.id,f)||{};
-    const bg = acap.empresa||acap.horario ? '#fff8e1' : '#fff';
-    const border = acap.empresa||acap.horario ? '1px solid #f39c12' : '1px solid transparent';
-    return `<div style="background:${bg};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${border}">
-      <div style="font-weight:700;font-size:13px;color:${acap.empresa||acap.horario?'#e67e22':'var(--primary)'};margin-bottom:8px">${i+1}. ${esc(a.nombre)}</div>
+    const tiene = !!(acap.empresa||acap.horario);
+    return `<div style="background:${tiene?'#fff8e1':'#fff'};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${tiene?'1px solid #f39c12':'1px solid transparent'}">
+      <div style="font-weight:700;font-size:13px;color:${tiene?'#e67e22':'var(--primary)'};margin-bottom:10px">${i+1}. ${esc(a.nombre)}</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="acap_h_${a.id}" class="inp" placeholder="Horario (ej: 14 a 16)" value="${esc(acap.horario||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
+        <input id="acap_e_${a.id}" class="inp" placeholder="Lugar / Empresa" value="${esc(acap.empresa||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
+      </div>
       <div style="display:flex;gap:8px">
-        <input class="inp" placeholder="Horario (ej: 14 a 16)" value="${esc(acap.horario||'')}" style="flex:1;font-size:12px;padding:8px 10px" onchange="updateAcap('${c.id}','${a.id}','horario',this.value)"/>
-        <input class="inp" placeholder="Lugar / Empresa" value="${esc(acap.empresa||'')}" style="flex:1;font-size:12px;padding:8px 10px" onchange="updateAcap('${c.id}','${a.id}','empresa',this.value)"/>
+        <button onclick="saveAcap('${c.id}','${a.id}')" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:8px;color:#fff;font-weight:700;font-size:12px">Guardar</button>
+        ${tiene?`<button onclick="clearAcap('${c.id}','${a.id}')" style="background:#fff0f0;border:1px solid #e74c3c;border-radius:10px;padding:8px 12px;color:#e74c3c;font-weight:700;font-size:12px">Borrar</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -498,7 +524,7 @@ function buildAcap(c){
   return `
     <div style="background:#eff3ff;border-radius:12px;padding:12px 14px;margin-bottom:16px">
       <div style="font-weight:700;color:var(--accent);font-size:13px;margin-bottom:4px">¿CÓMO FUNCIONA?</div>
-      <div style="font-size:12px;color:#555">Cargá empresa y horario. El alumno se marcará automáticamente como AC en asistencia.</div>
+      <div style="font-size:12px;color:#555">Cargá empresa y horario por alumno. Al guardar se marca automáticamente como AC en asistencia.</div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <button onclick="setAcapFecha('${addDays(f,-1)}')" style="background:#fff;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)">${ICONS.chevL}</button>
@@ -510,7 +536,8 @@ function buildAcap(c){
 
 // ---- LISTAS TAB ----
 function buildListas(c){
-  if(state._listaActiva!==undefined && state._listaActiva!==null){
+  // Fix: use undefined check properly
+  if(state._listaActiva !== null && state._listaActiva !== undefined){
     return buildListaDetalle(c);
   }
   const lsts = state.listas[c.id]||[];
@@ -518,13 +545,19 @@ function buildListas(c){
     <span style="font-weight:700;font-size:15px;color:var(--primary)">Listas personalizadas</span>
     <button style="background:var(--accent);border:none;border-radius:10px;padding:8px 14px;color:#fff;font-weight:700;font-size:13px" onclick="openModal('lista')">+ Nueva</button>
   </div>`;
-  if(!lsts.length) html+=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:40px">📋</div><div style="margin-top:12px;font-size:14px">No hay listas todavía</div></div>`;
+  if(!lsts.length) html+=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:40px">📋</div><div style="margin-top:12px;font-size:14px">No hay listas todavía</div><div style="font-size:12px;margin-top:4px">Tocá + Nueva para crear una</div></div>`;
   lsts.forEach((l,i)=>{
+    const totalChecks = Object.values(l.checks||{}).filter(Boolean).length;
+    const totalPosibles = (state.alumnos[c.id]||[]).length * (l.columnas||[]).length;
     html+=`<div class="card" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="setListaActiva(${i})">
-      <div><div style="font-weight:700;color:var(--primary);font-size:14px">${esc(l.nombre)}</div><div style="font-size:12px;color:#888">${(l.columnas||[]).join(' · ')}</div></div>
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--primary);font-size:14px">${esc(l.nombre)}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px">${(l.columnas||[]).join(' · ')}</div>
+        <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${totalChecks} / ${totalPosibles} marcados</div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button onclick="event.stopPropagation();borrarLista(${i})" style="background:none;border:none;color:#e74c3c">${ICONS.trash}</button>
-        ${ICONS.chevR}
+        <button onclick="event.stopPropagation();borrarLista(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
+        <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
     </div>`;
   });
@@ -937,7 +970,7 @@ function setHorCurso(id){ state._horCurso=id; render(); }
 function setCalFecha(f){ state._calFecha=f; render(); }
 function selDay(iso){ state._selDay=iso; render(); }
 function setNotasOrden(v){ state._notasOrden=v; render(); }
-function setListaActiva(i){ state._listaActiva=i; render(); }
+function setListaActiva(i){ state._listaActiva = (i===null||i===undefined) ? null : i; render(); }
 
 // Modals
 function openModal(type, extra){
@@ -965,12 +998,32 @@ function setCursoColor(c){ document.getElementById('c_color').value=c; document.
 // Asistencia
 function toggleAsist(cursoId, alumnoId, fecha, estado){
   const cur = getAsist(cursoId,alumnoId,fecha);
-  setAsist(cursoId, alumnoId, fecha, cur===estado ? null : estado);
+  const nuevo = (estado === 'null' || estado === null || cur===estado) ? null : estado;
+  setAsist(cursoId, alumnoId, fecha, nuevo);
   render();
 }
 
 // ACAP
+function saveAcap(cursoId, alumnoId){
+  const f = state._acapFecha||todayISO();
+  const k=`${cursoId}_${alumnoId}_${f}`;
+  const horario = document.getElementById(`acap_h_${alumnoId}`)?.value||'';
+  const empresa = document.getElementById(`acap_e_${alumnoId}`)?.value||'';
+  state.acaps[k]={horario,empresa};
+  if(horario||empresa){
+    setAsist(cursoId,alumnoId,f,'AC');
+  }
+  save(); render();
+}
+function clearAcap(cursoId, alumnoId){
+  const f = state._acapFecha||todayISO();
+  const k=`${cursoId}_${alumnoId}_${f}`;
+  delete state.acaps[k];
+  setAsist(cursoId,alumnoId,f,null);
+  save(); render();
+}
 function updateAcap(cursoId, alumnoId, field, val){
+  // kept for compatibility
   const f = state._acapFecha||todayISO();
   const k=`${cursoId}_${alumnoId}_${f}`;
   const prev = state.acaps[k]||{};
@@ -979,6 +1032,12 @@ function updateAcap(cursoId, alumnoId, field, val){
     setAsist(cursoId,alumnoId,f,'AC');
   }
   save();
+}
+
+// Toggle expand asistencia row
+function toggleAsistRow(rowId){
+  const exp = document.getElementById('exp_'+rowId);
+  if(exp) exp.classList.toggle('open');
 }
 
 // Alumnos
@@ -1018,6 +1077,7 @@ function guardarLista(){
   if(!cols.length) return;
   const cursoId = state.cursoActivo;
   state.listas[cursoId]=[...(state.listas[cursoId]||[]),{nombre,columnas:cols,checks:{}}];
+  state._listaActiva = null;
   save(); closeModal();
 }
 function borrarLista(i){
