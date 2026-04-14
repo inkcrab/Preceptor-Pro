@@ -1161,7 +1161,24 @@ function guardarCurso(){
   else { const nc={...c,id:uid()}; state.cursos=[...state.cursos,nc]; state.alumnos[nc.id]=[]; }
   save(); closeModal();
 }
-function borrarCurso(id){ if(confirm('¿Borrar curso y todos sus datos?')){ state.cursos=state.cursos.filter(c=>c.id!==id); delete state.alumnos[id]; save(); render(); } }
+function borrarCurso(id){
+  if(!confirm('¿Borrar curso y todos sus datos?')) return;
+
+  state.cursos = state.cursos.filter(c=>c.id!==id);
+  delete state.alumnos[id];
+  delete state.listas[id];
+  delete state.horarios[id];
+
+  Object.keys(state.asistencia).forEach(k=>{
+    if(k.startsWith(id+'_')) delete state.asistencia[k];
+  });
+  Object.keys(state.acaps).forEach(k=>{
+    if(k.startsWith(id+'_')) delete state.acaps[k];
+  });
+
+  save();
+  render();
+}
 
 // Horarios
 function guardarCeldaHorario(){
@@ -1207,4 +1224,3 @@ render();
 </script>
 </body>
 </html>
-
