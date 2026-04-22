@@ -603,6 +603,7 @@ function buildAcap(c){
       <div style="display:flex;gap:8px">
         <button onclick="saveAcap('${c.id}','${a.id}')" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:8px;color:#fff;font-weight:700;font-size:12px">Guardar</button>
         <button onclick="openAcapFechasModal('${c.id}','${a.id}')" style="background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:12px">Fechas</button>
+        <button onclick="openAcapCopyModal('${c.id}','${a.id}')" style="background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:8px 12px;color:#555;font-weight:700;font-size:12px">Copiar fechas</button>
         ${tiene?`<button onclick="clearAcap('${c.id}','${a.id}')" style="background:#fff0f0;border:1px solid #e74c3c;border-radius:10px;padding:8px 12px;color:#e74c3c;font-weight:700;font-size:12px">Borrar</button>`:''}
       </div>
     </div>`;
@@ -957,6 +958,7 @@ function buildModal(){
   else if(m==='curso'||m==='cursoEdit') content = buildModalCurso(d);
   else if(m==='lista') content = buildModalLista(d);
   else if(m==='acapFechas') content = buildModalAcapFechas(d);
+  else if(m==='acapCopy') content = buildModalAcapCopy(d);
   else if(m==='horario') content = buildModalHorario(d);
 
   return `<div class="modal-overlay" onclick="closeModal()">
@@ -976,6 +978,7 @@ function modalTitle(m,d){
   if(m==='curso'||m==='cursoEdit') return d.id?'Editar curso':'Nuevo curso';
   if(m==='lista') return 'Nueva lista';
   if(m==='acapFechas') return 'ACAP por fechas';
+  if(m==='acapCopy') return 'Copiar fechas ACAP';
   if(m==='horario') return `${HORAS[d.hora]||''} · ${d.dia||''}`;
   return '';
 }
@@ -1071,6 +1074,31 @@ function buildModalAcapFechas(d){
     </div>`;
 }
 
+function buildModalAcapCopy(d){
+  const alumnos = (state.alumnos[d.cursoId]||[]);
+  const destino = alumnos.find(a=>a.id===d.alumnoId) || {};
+  const opciones = alumnos
+    .filter(a=>a.id!==d.alumnoId)
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre))
+    .map(a=>`<option value="${a.id}">${esc(a.nombre)}</option>`)
+    .join('');
+
+  return `
+    <div style="background:#eff3ff;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.4px">ALUMNO DESTINO</div>
+      <div style="font-size:14px;color:var(--primary);font-weight:700;margin-top:4px">${esc(destino.nombre||'')}</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label>ALUMNO ORIGEN</label>
+      <select id="acap_copy_source" class="inp">
+        <option value="">Seleccionar alumno</option>
+        ${opciones}
+      </select>
+    </div>
+    <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:16px">Se agregarán todas las fechas ACAP del alumno origen al alumno actual, sin duplicar fechas ya existentes.</div>
+    <button onclick="copiarFechasAcapDesdeAlumno()" class="btn-primary">Copiar</button>`;
+}
+
 // ============================================================
 // EVENT HANDLERS
 // ============================================================
@@ -1125,6 +1153,9 @@ function openHorModal(cursoId, hora, dia){
 }
 function openAcapFechasModal(cursoId, alumnoId){
   setState({modal:'acapFechas', modalData:{cursoId, alumnoId}});
+}
+function openAcapCopyModal(cursoId, alumnoId){
+  setState({modal:'acapCopy', modalData:{cursoId, alumnoId}});
 }
 
 // Color pickers
@@ -1214,6 +1245,30 @@ function cargarAcapMesCompleto(){
 
   save();
   closeModal();
+}
+function copiarFechasAcapDesdeAlumno(){
+  const d = state.modalData || {};
+  const cursoId = d.cursoId;
+  const destinoId = d.alumnoId;
+  const origenId = document.getElementById('acap_copy_source')?.value || '';
+  if(!cursoId || !destinoId || !origenId) return;
+
+  let copied = 0;
+  Object.entries(state.acaps).forEach(([key, value])=>{
+    if(!key.startsWith(`${cursoId}_${origenId}_`)) return;
+    const fecha = key.split('_').slice(-1)[0];
+    const destKey = `${cursoId}_${destinoId}_${fecha}`;
+    if(state.acaps[destKey]) return;
+
+    state.acaps[destKey] = {...value};
+    setAsistValue(cursoId, destinoId, fecha, 'AC');
+    copied++;
+  });
+
+  save();
+  closeModal();
+  render();
+  alert(copied ? 'Fechas copiadas correctamente' : 'No había fechas nuevas para copiar');
 }
 
 // Toggle expand asistencia row
