@@ -79,6 +79,7 @@
 <div class="app" id="app">
   <!-- Rendered by JS -->
 </div>
+<input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
 
 <script>
 // ============================================================
@@ -104,6 +105,13 @@ const FERIADOS = [
 ];
 const COLORES = ["#6C63FF","#E74C3C","#27AE60","#F39C12","#2980B9","#8E44AD","#16A085","#D35400","#E91E63","#1a1a2e"];
 const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes"];
+const DIAS_ACAP = [
+  {label:"L", value:"lunes"},
+  {label:"M", value:"martes"},
+  {label:"X", value:"miercoles"},
+  {label:"J", value:"jueves"},
+  {label:"V", value:"viernes"},
+];
 const HORAS = ["12:30 - 13:10","13:10 - 13:50","13:50 - 14:30","14:40 - 15:20","15:20 - 16:00","16:00 - 16:40","16:50 - 17:30","17:30 - 18:10","CONTRATURNO"];
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
@@ -157,6 +165,7 @@ let state = {
   vistaAsist: 'dia',
   _listaActiva: null,
   _listaCols: ['','',''],
+  _acapOpen: {},
   // Modals
   modal: null,
   modalData: {},
@@ -180,7 +189,7 @@ function save(){
 // ============================================================
 function toISO(d){return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;}
 function p2(n){return String(n).padStart(2,'0');}
-function addDays(iso,n){const d=new Date(iso);d.setDate(d.getDate()+n);return toISO(d);}
+function addDays(iso,n){const d=isoToDate(iso);d.setDate(d.getDate()+n);return toISO(d);}
 function isoToDate(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
 function fmtFecha(iso){const d=isoToDate(iso);const days=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];return `${days[d.getDay()]}, ${d.getDate()} de ${MESES[d.getMonth()]} de ${d.getFullYear()}`;}
 function startOfWeek(iso){const d=isoToDate(iso);const day=d.getDay();const diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return toISO(d);}
@@ -189,15 +198,65 @@ function todayISO(){return toISO(new Date());}
 function saludo(){const h=new Date().getHours();if(h<12)return'¡Buenos días';if(h<20)return'¡Buenas tardes';return'¡Buenas noches';}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function uid(){return '_'+Math.random().toString(36).slice(2);}
+function normalizeDia(d){return String(d||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function diaSemanaISO(iso){
+  const dias = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+  return dias[isoToDate(iso).getDay()];
+}
+function parseFechaInput(s){
+  const txt = String(s||'').trim();
+  if(!txt) return null;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(txt)) return txt;
+  const m = txt.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(!m) return null;
+  return `${m[3]}-${p2(Number(m[2]))}-${p2(Number(m[1]))}`;
+}
+function buildHorario(desde,hasta){
+  if(desde && hasta) return `${desde} a ${hasta}`;
+  if(desde) return `Desde ${desde}`;
+  if(hasta) return `Hasta ${hasta}`;
+  return '';
+}
 
 function getAsist(cursoId,alumnoId,fecha){return (state.asistencia[`${cursoId}_${alumnoId}_${fecha}`])||null;}
-function setAsist(cursoId,alumnoId,fecha,val){
+function setAsistValue(cursoId,alumnoId,fecha,val){
   const k=`${cursoId}_${alumnoId}_${fecha}`;
-  if(val===null)delete state.asistencia[k];
+  if(val===null) delete state.asistencia[k];
   else state.asistencia[k]=val;
+}
+function setAsist(cursoId,alumnoId,fecha,val){
+  setAsistValue(cursoId,alumnoId,fecha,val);
   save();
 }
 function getAcap(cursoId,alumnoId,fecha){return state.acaps[`${cursoId}_${alumnoId}_${fecha}`]||null;}
+function upsertAcapRecord(cursoId, alumnoId, fecha, empresa, horario, markAsistencia){
+  const k = `${cursoId}_${alumnoId}_${fecha}`;
+  state.acaps[k] = {
+    ...(state.acaps[k]||{}),
+    empresa: empresa || '',
+    horario: horario || '',
+  };
+  if(markAsistencia) setAsistValue(cursoId, alumnoId, fecha, 'AC');
+}
+function ensureAutoAcapForDate(fecha, cursoId){
+  const cursos = cursoId ? state.cursos.filter(c=>c.id===cursoId) : state.cursos;
+  const dia = diaSemanaISO(fecha);
+  let changed = false;
+
+  cursos.forEach(curso=>{
+    const alumnos = state.alumnos[curso.id] || [];
+    alumnos.forEach(alumno=>{
+      const diasACAP = (alumno.diasACAP || []).map(normalizeDia);
+      const key = `${curso.id}_${alumno.id}_${fecha}`;
+      if(diasACAP.includes(dia) && !state.acaps[key]){
+        state.acaps[key] = {};
+        changed = true;
+      }
+    });
+  });
+
+  if(changed) save();
+}
 
 function applyColors(){
   document.documentElement.style.setProperty('--primary',state.colors.primary);
@@ -332,6 +391,13 @@ function buildHome(){
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:8px">
       <div><div style="font-weight:800;font-size:18px;color:var(--primary)">Mis Cursos</div><div style="font-size:12px;color:#888">Gestión de asistencia y novedades</div></div>
       <button style="background:none;border:none;color:var(--accent);font-weight:700;font-size:13px" onclick="openModal('curso')">+ Nuevo</button>
+    </div>
+    <div class="card" style="display:flex;justify-content:space-between;align-items:center;background:#fff8e1;border-left:5px solid #f39c12">
+      <div>
+        <div style="font-size:11px;color:#e67e22;font-weight:700;letter-spacing:.4px">ACAP HOY</div>
+        <div style="font-size:13px;color:#7a5a00;margin-top:4px">Alumnos con ACAP en la fecha actual</div>
+      </div>
+      <div style="font-size:30px;font-weight:900;color:#e67e22;min-width:40px;text-align:right">${acapsHoy.length}</div>
     </div>
     ${cursosHtml}
     <div style="font-weight:800;font-size:16px;color:var(--primary);margin-bottom:12px;margin-top:4px">Accesos Rápidos</div>
@@ -508,14 +574,35 @@ function buildAcap(c){
   const rows = als.map((a,i)=>{
     const acap = getAcap(c.id,a.id,f)||{};
     const tiene = !!(acap.empresa||acap.horario);
+    const openKey = `${c.id}_${a.id}`;
+    const isOpen = !!state._acapOpen?.[openKey];
+    const acapFechas = Object.entries(state.acaps)
+      .filter(([k,v])=>k.startsWith(`${c.id}_${a.id}_`) && (v?.empresa || v?.horario))
+      .sort((a,b)=>a[0].localeCompare(b[0]))
+      .map(([k,v])=>{
+        const fecha = k.split('_').slice(-1)[0];
+        return `<div style="background:#fff;border-radius:10px;padding:8px 10px;border:1px solid #f3d38a">
+          <div style="font-size:11px;font-weight:800;color:#e67e22">${p2(isoToDate(fecha).getDate())}/${p2(isoToDate(fecha).getMonth()+1)}/${isoToDate(fecha).getFullYear()}</div>
+          <div style="font-size:12px;color:var(--primary);margin-top:2px">${esc(v.empresa||'Sin empresa')}</div>
+          <div style="font-size:11px;color:#777;margin-top:2px">${esc(v.horario||'Sin horario')}</div>
+        </div>`;
+      }).join('');
     return `<div style="background:${tiene?'#fff8e1':'#fff'};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${tiene?'1px solid #f39c12':'1px solid transparent'}">
-      <div style="font-weight:700;font-size:13px;color:${tiene?'#e67e22':'var(--primary)'};margin-bottom:10px">${i+1}. ${esc(a.nombre)}</div>
+      <button onclick="toggleAcapAlumno('${openKey}')" style="width:100%;background:none;border:none;padding:0 0 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left">
+        <span style="font-weight:700;font-size:13px;color:${tiene?'#e67e22':'var(--primary)'}">${i+1}. ${esc(a.nombre)}</span>
+        <span style="font-size:14px;color:${tiene?'#e67e22':'#888'};font-weight:800">${isOpen?'▼':'▶'}</span>
+      </button>
+      ${isOpen && acapFechas ? `<div style="margin-bottom:10px">
+        <div style="font-size:11px;color:#888;font-weight:700;margin-bottom:6px">FECHAS CARGADAS</div>
+        <div style="display:flex;flex-direction:column;gap:6px">${acapFechas}</div>
+      </div>` : ''}
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <input id="acap_h_${a.id}" class="inp" placeholder="Horario (ej: 14 a 16)" value="${esc(acap.horario||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
         <input id="acap_e_${a.id}" class="inp" placeholder="Lugar / Empresa" value="${esc(acap.empresa||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
       </div>
       <div style="display:flex;gap:8px">
         <button onclick="saveAcap('${c.id}','${a.id}')" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:8px;color:#fff;font-weight:700;font-size:12px">Guardar</button>
+        <button onclick="openAcapFechasModal('${c.id}','${a.id}')" style="background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:12px">Fechas</button>
         ${tiene?`<button onclick="clearAcap('${c.id}','${a.id}')" style="background:#fff0f0;border:1px solid #e74c3c;border-radius:10px;padding:8px 12px;color:#e74c3c;font-weight:700;font-size:12px">Borrar</button>`:''}
       </div>
     </div>`;
@@ -591,8 +678,10 @@ function buildEditar(c){
   const als = state.alumnos[c.id]||[];
   const rows = [...als].sort((a,b)=>a.nombre.localeCompare(b.nombre)).map((a,i)=>`
     <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.05);display:flex;justify-content:space-between;align-items:center">
-      <span style="font-weight:600;font-size:13px;color:var(--primary)">${i+1}. ${esc(a.nombre)}</span>
-      <button onclick="borrarAlumno('${c.id}','${a.id}')" style="background:none;border:none;color:#e74c3c">${ICONS.trash}</button>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--primary)">${i+1}. ${esc(a.nombre)}</div>
+      </div>
+      <button onclick="borrarAlumno('${c.id}','${a.id}')" style="background:none;border:none;color:#e74c3c;margin-left:10px">${ICONS.trash}</button>
     </div>`).join('');
 
   return `
@@ -839,6 +928,14 @@ function buildConfig(){
         </div>`).join('')}
       <button onclick="guardarColores()" class="btn-primary">Aplicar colores</button>
     </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">BACKUP DE DATOS</div>
+      <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Exportá o restaurá todos los datos guardados en este dispositivo.</div>
+      <div style="display:flex;gap:10px">
+        <button onclick="exportarDatos()" class="btn-primary" style="flex:1">Exportar datos</button>
+        <button onclick="seleccionarBackup()" class="btn-ghost" style="flex:1">Importar datos</button>
+      </div>
+    </div>
     <div class="card">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">MIS CURSOS</div>
       ${cursosHtml}
@@ -859,6 +956,7 @@ function buildModal(){
   else if(m==='nota') content = buildModalNota(d);
   else if(m==='curso'||m==='cursoEdit') content = buildModalCurso(d);
   else if(m==='lista') content = buildModalLista(d);
+  else if(m==='acapFechas') content = buildModalAcapFechas(d);
   else if(m==='horario') content = buildModalHorario(d);
 
   return `<div class="modal-overlay" onclick="closeModal()">
@@ -877,6 +975,7 @@ function modalTitle(m,d){
   if(m==='nota') return d.id?'Editar nota':'Nueva nota';
   if(m==='curso'||m==='cursoEdit') return d.id?'Editar curso':'Nuevo curso';
   if(m==='lista') return 'Nueva lista';
+  if(m==='acapFechas') return 'ACAP por fechas';
   if(m==='horario') return `${HORAS[d.hora]||''} · ${d.dia||''}`;
   return '';
 }
@@ -947,6 +1046,31 @@ function buildModalHorario(d){
     </div>`;
 }
 
+function buildModalAcapFechas(d){
+  const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId) || {};
+  return `
+    <div style="background:#fff8e1;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:11px;color:#e67e22;font-weight:700;letter-spacing:.4px">ALUMNO</div>
+      <div style="font-size:14px;color:var(--primary);font-weight:700;margin-top:4px">${esc(alumno.nombre||'')}</div>
+    </div>
+    <div style="margin-bottom:12px"><label>EMPRESA</label><input class="inp" id="af_empresa" placeholder="Ej: FEDEX"/></div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1"><label>HORA DESDE</label><input type="time" class="inp" id="af_desde"/></div>
+      <div style="flex:1"><label>HORA HASTA</label><input type="time" class="inp" id="af_hasta"/></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-weight:700;color:#888;font-size:12px;margin-bottom:8px">CARGA MANUAL DE FECHAS</div>
+      <textarea id="af_fechas" rows="6" class="inp" placeholder="Una fecha por línea&#10;14/04/2026&#10;15/04/2026&#10;22/04/2026"></textarea>
+      <div style="font-size:11px;color:#888;margin-top:8px">Acepta formato dd/mm/aaaa o aaaa-mm-dd.</div>
+      <button onclick="guardarAcapFechas()" class="btn-primary" style="margin-top:12px">Guardar fechas</button>
+    </div>
+    <div class="card">
+      <div style="font-weight:700;color:#888;font-size:12px;margin-bottom:8px">CARGA RÁPIDA DE MES COMPLETO</div>
+      <div style="margin-bottom:12px"><label>MES</label><input type="month" class="inp" id="af_mes"/></div>
+      <button onclick="cargarAcapMesCompleto()" class="btn-primary">Cargar mes completo</button>
+    </div>`;
+}
+
 // ============================================================
 // EVENT HANDLERS
 // ============================================================
@@ -961,11 +1085,21 @@ function setState(updates, skipRender){
 function navTo(tab){ setState({tab, screen:'home', _listaActiva:undefined, _horCurso:null}); }
 function goHome(){ setState({screen:'home', tab:'cursos', _listaActiva:undefined, _horCurso:null}); }
 function goScreen(s){ setState({screen:s}); }
-function goCurso(id){ setState({screen:'curso', cursoActivo:id, cursoTab:'asistencia', fechaAsist:todayISO(), vistaAsist:'dia', _acapFecha:todayISO(), _listaActiva:undefined}); }
+function goCurso(id){
+  const hoy = todayISO();
+  ensureAutoAcapForDate(hoy, id);
+  setState({screen:'curso', cursoActivo:id, cursoTab:'asistencia', fechaAsist:hoy, vistaAsist:'dia', _acapFecha:hoy, _listaActiva:undefined});
+}
 function setCursoTab(t){ setState({cursoTab:t}); }
 function setVista(v){ setState({vistaAsist:v}); }
-function setFechaAsist(f){ setState({fechaAsist:f}); }
-function setAcapFecha(f){ state._acapFecha=f; render(); }
+function setFechaAsist(f){
+  if(state.cursoActivo) ensureAutoAcapForDate(f, state.cursoActivo);
+  setState({fechaAsist:f});
+}
+function setAcapFecha(f){
+  if(state.cursoActivo) ensureAutoAcapForDate(f, state.cursoActivo);
+  state._acapFecha=f; render();
+}
 function setHorCurso(id){ state._horCurso=id; render(); }
 function setCalFecha(f){ state._calFecha=f; render(); }
 function selDay(iso){ state._selDay=iso; render(); }
@@ -989,6 +1123,9 @@ function closeModal(){ setState({modal:null, modalData:{}}); }
 function openHorModal(cursoId, hora, dia){
   setState({modal:'horario', modalData:{cursoId, hora, dia}});
 }
+function openAcapFechasModal(cursoId, alumnoId){
+  setState({modal:'acapFechas', modalData:{cursoId, alumnoId}});
+}
 
 // Color pickers
 function setEvColor(c){ document.getElementById('ev_color').value=c; document.getElementById('evColorPicker').innerHTML=colorPicker(c,'setEvColor'); }
@@ -1006,10 +1143,9 @@ function toggleAsist(cursoId, alumnoId, fecha, estado){
 // ACAP
 function saveAcap(cursoId, alumnoId){
   const f = state._acapFecha||todayISO();
-  const k=`${cursoId}_${alumnoId}_${f}`;
   const horario = document.getElementById(`acap_h_${alumnoId}`)?.value||'';
   const empresa = document.getElementById(`acap_e_${alumnoId}`)?.value||'';
-  state.acaps[k]={horario,empresa};
+  upsertAcapRecord(cursoId, alumnoId, f, empresa, horario, false);
   if(horario||empresa){
     setAsist(cursoId,alumnoId,f,'AC');
   }
@@ -1033,6 +1169,52 @@ function updateAcap(cursoId, alumnoId, field, val){
   }
   save();
 }
+function toggleAcapAlumno(key){
+  state._acapOpen = {
+    ...(state._acapOpen||{}),
+    [key]: !state._acapOpen?.[key],
+  };
+  render();
+}
+function guardarAcapFechas(){
+  const d = state.modalData || {};
+  const empresa = document.getElementById('af_empresa')?.value?.trim() || '';
+  const desde = document.getElementById('af_desde')?.value || '';
+  const hasta = document.getElementById('af_hasta')?.value || '';
+  const horario = buildHorario(desde, hasta);
+  const fechas = [...new Set((document.getElementById('af_fechas')?.value || '')
+    .split('\n')
+    .map(parseFechaInput)
+    .filter(Boolean))];
+
+  if(!d.cursoId || !d.alumnoId || !fechas.length || !empresa || !horario) return;
+
+  fechas.forEach(fecha=>{
+    upsertAcapRecord(d.cursoId, d.alumnoId, fecha, empresa, horario, true);
+  });
+
+  save();
+  closeModal();
+}
+function cargarAcapMesCompleto(){
+  const d = state.modalData || {};
+  const empresa = document.getElementById('af_empresa')?.value?.trim() || '';
+  const desde = document.getElementById('af_desde')?.value || '';
+  const hasta = document.getElementById('af_hasta')?.value || '';
+  const horario = buildHorario(desde, hasta);
+  const mes = document.getElementById('af_mes')?.value || '';
+  if(!d.cursoId || !d.alumnoId || !mes || !empresa || !horario) return;
+
+  const [year, month] = mes.split('-').map(Number);
+  const totalDias = daysInMonth(year, month-1);
+  for(let dia=1; dia<=totalDias; dia++){
+    const fecha = `${year}-${p2(month)}-${p2(dia)}`;
+    upsertAcapRecord(d.cursoId, d.alumnoId, fecha, empresa, horario, true);
+  }
+
+  save();
+  closeModal();
+}
 
 // Toggle expand asistencia row
 function toggleAsistRow(rowId){
@@ -1045,7 +1227,7 @@ function agregarAlumno(cursoId){
   const inp = document.getElementById('newAlumnoInput');
   const nombre = inp?.value?.trim();
   if(!nombre) return;
-  const a = {id:uid(), nombre:nombre.toUpperCase()};
+  const a = {id:uid(), nombre:nombre.toUpperCase(), diasACAP:[]};
   state.alumnos[cursoId]=[...(state.alumnos[cursoId]||[]),a];
   save();
   render();
@@ -1054,6 +1236,17 @@ function borrarAlumno(cursoId, alumnoId){
   if(!confirm('¿Borrar alumno?')) return;
   state.alumnos[cursoId]=(state.alumnos[cursoId]||[]).filter(a=>a.id!==alumnoId);
   save(); render();
+}
+function toggleAlumnoDiaACAP(cursoId, alumnoId, dia){
+  state.alumnos[cursoId] = (state.alumnos[cursoId]||[]).map(a=>{
+    if(a.id!==alumnoId) return a;
+    const dias = (a.diasACAP||[]).map(normalizeDia);
+    const nextDias = dias.includes(dia) ? dias.filter(d=>d!==dia) : [...dias, dia];
+    return {...a, diasACAP: nextDias};
+  });
+  ensureAutoAcapForDate(state._acapFecha || state.fechaAsist || todayISO(), cursoId);
+  save();
+  render();
 }
 function toggleImport(cursoId){
   const box = document.getElementById('importBox');
@@ -1064,7 +1257,7 @@ function importarLista(cursoId){
   const lines = txt.split('\n').map(l=>l.trim()).filter(Boolean);
   const parsed = lines.map(l=>l.replace(/^\d+[\.\-\)\s]+/,'').trim()).filter(Boolean);
   if(!parsed.length) return;
-  const newAls = parsed.map((n,i)=>({id:uid(),nombre:n.toUpperCase()}));
+  const newAls = parsed.map((n,i)=>({id:uid(),nombre:n.toUpperCase(),diasACAP:[]}));
   state.alumnos[cursoId]=[...(state.alumnos[cursoId]||[]),...newAls];
   save(); render();
 }
@@ -1216,10 +1409,58 @@ function guardarColores(){
   save(); render();
 }
 
+// Backup
+function exportarDatos(){
+  const json = JSON.stringify(state, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup_acap_${todayISO()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function seleccionarBackup(){
+  const input = document.getElementById('backupImportInput');
+  if(!input) return;
+  input.value = '';
+  input.click();
+}
+function importarBackup(event){
+  const file = event?.target?.files?.[0];
+  if(!file) return;
+  if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')){
+    event.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const data = JSON.parse(e.target?.result || '{}');
+      if(!data || typeof data !== 'object') throw new Error('invalid');
+      state = data;
+      if(!state._listaCols) state._listaCols = ['','',''];
+      if(!state._acapOpen) state._acapOpen = {};
+      if(typeof state.modal === 'undefined') state.modal = null;
+      if(typeof state.modalData === 'undefined') state.modalData = {};
+      save();
+      render();
+    }catch{
+      alert('No se pudo importar el archivo JSON.');
+    }finally{
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
 // ============================================================
 // INIT
 // ============================================================
 applyColors();
+ensureAutoAcapForDate(todayISO());
 render();
 </script>
 </body>
