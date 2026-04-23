@@ -155,6 +155,7 @@ let state = {
   eventos: S.get('pp_eventos', []),
   notas: S.get('pp_notas', []),
   listas: S.get('pp_listas', {}),
+  acapHistorial: S.get('pp_acap_hist', []),
   colors: S.get('pp_colors', {primary:'#1a1a2e', accent:'#4361ee', bg:'#f4f6fb'}),
   // Nav
   screen: 'home', // home | curso | perfil | config
@@ -166,6 +167,10 @@ let state = {
   _listaActiva: null,
   _listaCols: ['','',''],
   _acapOpen: {},
+  _acapClipboard: null,
+  _acapSearch: '',
+  _acapDesde: '',
+  _acapHasta: '',
   // Modals
   modal: null,
   modalData: {},
@@ -181,6 +186,7 @@ function save(){
   S.set('pp_eventos',state.eventos);
   S.set('pp_notas',state.notas);
   S.set('pp_listas',state.listas);
+  S.set('pp_acap_hist',state.acapHistorial);
   S.set('pp_colors',state.colors);
 }
 
@@ -216,6 +222,65 @@ function buildHorario(desde,hasta){
   if(desde) return `Desde ${desde}`;
   if(hasta) return `Hasta ${hasta}`;
   return '';
+}
+function backupTimestamp(){
+  const now = new Date();
+  return `${now.getFullYear()}${p2(now.getMonth()+1)}${p2(now.getDate())}_${p2(now.getHours())}${p2(now.getMinutes())}`;
+}
+function sanitizeFileName(s){return String(s||'archivo').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_');}
+function withinAcapRange(fecha, desde, hasta){
+  if(desde && fecha < desde) return false;
+  if(hasta && fecha > hasta) return false;
+  return true;
+}
+function parseHorarioData(data){
+  const horaDesde = data?.horaDesde || '';
+  const horaHasta = data?.horaHasta || '';
+  if(horaDesde || horaHasta){
+    return {horaDesde, horaHasta};
+  }
+  const horario = String(data?.horario||'');
+  const match = horario.match(/^\s*([^]+?)\s+a\s+([^]+?)\s*$/i);
+  if(match) return {horaDesde:match[1].trim(), horaHasta:match[2].trim()};
+  if(/^Desde\s+/i.test(horario)) return {horaDesde:horario.replace(/^Desde\s+/i,'').trim(), horaHasta:''};
+  if(/^Hasta\s+/i.test(horario)) return {horaDesde:'', horaHasta:horario.replace(/^Hasta\s+/i,'').trim()};
+  return {horaDesde:'', horaHasta:''};
+}
+function getAcapEntriesForAlumno(cursoId, alumnoId, opts){
+  const {desde='', hasta=''} = opts||{};
+  return Object.entries(state.acaps)
+    .filter(([key, value])=>{
+      if(!key.startsWith(`${cursoId}_${alumnoId}_`)) return false;
+      const fecha = key.split('_').slice(-1)[0];
+      return (value?.empresa || value?.horario || value?.horaDesde || value?.horaHasta || value?.lugar) && withinAcapRange(fecha, desde, hasta);
+    })
+    .map(([key, value])=>({key, fecha:key.split('_').slice(-1)[0], data:value}))
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha));
+}
+function getAcapRowsForCurso(cursoId, opts){
+  const {desde='', hasta='', search=''} = opts||{};
+  const normalizedSearch = normalizeDia(search||'');
+  return (state.alumnos[cursoId]||[])
+    .filter(alumno=>!normalizedSearch || normalizeDia(alumno.nombre).includes(normalizedSearch))
+    .flatMap(alumno=>getAcapEntriesForAlumno(cursoId, alumno.id, {desde, hasta}).map(entry=>({
+      alumno,
+      alumnoId: alumno.id,
+      fecha: entry.fecha,
+      data: entry.data,
+    })))
+    .sort((a,b)=>a.fecha.localeCompare(b.fecha) || a.alumno.nombre.localeCompare(b.alumno.nombre));
+}
+function guardarBackupLocalAcap(manual){
+  const key = `backup_acap_${backupTimestamp()}`;
+  try{ localStorage.setItem(key, JSON.stringify(state)); }catch{}
+  if(manual) alert(`Backup creado: ${key}`);
+  return key;
+}
+function logAcapHistory(accion, alumno){
+  state.acapHistorial = [
+    {fecha:new Date().toISOString(), accion, alumno},
+    ...(state.acapHistorial||[]),
+  ].slice(0,200);
 }
 
 function getAsist(cursoId,alumnoId,fecha){return (state.asistencia[`${cursoId}_${alumnoId}_${fecha}`])||null;}
@@ -418,6 +483,13 @@ function buildCurso(){
   else if(state.cursoTab==='acap') content = buildAcap(c);
   else if(state.cursoTab==='listas') content = buildListas(c);
   else if(state.cursoTab==='editar') content = buildEditar(c);
+  const extraToolbar = state.cursoTab==='acap' ? `
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="inp" value="${esc(state._acapSearch||'')}" placeholder="Buscar alumno por apellido o nombre" oninput="setAcapSearch(this.value)" style="flex:1"/>
+        <button onclick="setAcapFecha('${todayISO()}')" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 12px;color:#555;font-weight:700;font-size:12px;white-space:nowrap">Hoy</button>
+      </div>
+    </div>` : '';
 
   return `<div>
     <div style="padding:16px 16px 0;position:sticky;top:0;background:var(--bg);z-index:10">
@@ -433,7 +505,7 @@ function buildCurso(){
         ${['asistencia','acap','listas','editar'].map(t=>`<button class="tab-btn ${state.cursoTab===t?'active':''}" onclick="setCursoTab('${t}')">${t.toUpperCase()}</button>`).join('')}
       </div>
     </div>
-    <div style="padding:0 16px 90px">${content}</div>
+    <div style="padding:0 16px 90px">${extraToolbar}${content}</div>
   </div>`;
 }
 
@@ -567,20 +639,26 @@ function buildVistaMes(c, als, fecha){
 }
 
 function buildAcap(c){
-  const als = state.alumnos[c.id]||[];
+  const als = (state.alumnos[c.id]||[]).filter(a=>normalizeDia(a.nombre).includes(normalizeDia(state._acapSearch||'')));
   const f = state._acapFecha||todayISO();
   if(!state._acapFecha) state._acapFecha = todayISO();
+  const currentMonth = isoToDate(f);
+  const monthDays = daysInMonth(currentMonth.getFullYear(), currentMonth.getMonth());
+  const acapDaysThisMonth = new Set(
+    getAcapRowsForCurso(c.id, {})
+      .map(r=>r.fecha)
+      .filter(fecha=>fecha.startsWith(`${currentMonth.getFullYear()}-${p2(currentMonth.getMonth()+1)}-`))
+  );
 
   const rows = als.map((a,i)=>{
     const acap = getAcap(c.id,a.id,f)||{};
     const tiene = !!(acap.empresa||acap.horario);
     const openKey = `${c.id}_${a.id}`;
     const isOpen = !!state._acapOpen?.[openKey];
-    const acapFechas = Object.entries(state.acaps)
-      .filter(([k,v])=>k.startsWith(`${c.id}_${a.id}_`) && (v?.empresa || v?.horario))
-      .sort((a,b)=>a[0].localeCompare(b[0]))
-      .map(([k,v])=>{
-        const fecha = k.split('_').slice(-1)[0];
+    const entries = getAcapEntriesForAlumno(c.id, a.id, {desde:state._acapDesde, hasta:state._acapHasta});
+    const totalDias = entries.length;
+    const acapFechas = entries
+      .map(({fecha,data:v})=>{
         return `<div style="background:#fff;border-radius:10px;padding:8px 10px;border:1px solid #f3d38a">
           <div style="font-size:11px;font-weight:800;color:#e67e22">${p2(isoToDate(fecha).getDate())}/${p2(isoToDate(fecha).getMonth()+1)}/${isoToDate(fecha).getFullYear()}</div>
           <div style="font-size:12px;color:var(--primary);margin-top:2px">${esc(v.empresa||'Sin empresa')}</div>
@@ -588,10 +666,14 @@ function buildAcap(c){
         </div>`;
       }).join('');
     return `<div style="background:${tiene?'#fff8e1':'#fff'};border-radius:14px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 5px rgba(0,0,0,.06);border:${tiene?'1px solid #f39c12':'1px solid transparent'}">
-      <button onclick="toggleAcapAlumno('${openKey}')" style="width:100%;background:none;border:none;padding:0 0 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left">
-        <span style="font-weight:700;font-size:13px;color:${tiene?'#e67e22':'var(--primary)'}">${i+1}. ${esc(a.nombre)}</span>
-        <span style="font-size:14px;color:${tiene?'#e67e22':'#888'};font-weight:800">${isOpen?'▼':'▶'}</span>
-      </button>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+        <button onclick="toggleAcapAlumno('${openKey}')" style="flex:1;background:none;border:none;padding:0;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;min-width:0">
+          <span style="font-weight:700;font-size:13px;color:${tiene?'#e67e22':'var(--primary)'};min-width:0">${i+1}. ${esc(a.nombre)}</span>
+          <span style="font-size:14px;color:${tiene?'#e67e22':'#888'};font-weight:800;flex-shrink:0">${isOpen?'▼':'▶'}</span>
+        </button>
+        <button onclick="exportarAcapAlumnoPDF('${c.id}','${a.id}')" style="background:#fff;border:1px solid #ddd;border-radius:10px;padding:8px 12px;color:#555;font-weight:700;font-size:12px;white-space:nowrap;flex-shrink:0">Exportar PDF</button>
+      </div>
+      <div style="font-size:11px;color:#888;font-weight:700;margin:-4px 0 10px">Total: ${totalDias} día${totalDias===1?'':'s'}</div>
       ${isOpen && acapFechas ? `<div style="margin-bottom:10px">
         <div style="font-size:11px;color:#888;font-weight:700;margin-bottom:6px">FECHAS CARGADAS</div>
         <div style="display:flex;flex-direction:column;gap:6px">${acapFechas}</div>
@@ -600,11 +682,13 @@ function buildAcap(c){
         <input id="acap_h_${a.id}" class="inp" placeholder="Horario (ej: 14 a 16)" value="${esc(acap.horario||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
         <input id="acap_e_${a.id}" class="inp" placeholder="Lugar / Empresa" value="${esc(acap.empresa||'')}" style="flex:1;font-size:12px;padding:8px 10px"/>
       </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="saveAcap('${c.id}','${a.id}')" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:8px;color:#fff;font-weight:700;font-size:12px">Guardar</button>
-        <button onclick="openAcapFechasModal('${c.id}','${a.id}')" style="background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:12px">Fechas</button>
-        <button onclick="openAcapCopyModal('${c.id}','${a.id}')" style="background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:8px 12px;color:#555;font-weight:700;font-size:12px">Copiar fechas</button>
-        ${tiene?`<button onclick="clearAcap('${c.id}','${a.id}')" style="background:#fff0f0;border:1px solid #e74c3c;border-radius:10px;padding:8px 12px;color:#e74c3c;font-weight:700;font-size:12px">Borrar</button>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:stretch">
+        <button onclick="saveAcap('${c.id}','${a.id}')" style="flex:1 1 140px;background:var(--accent);border:none;border-radius:10px;padding:8px;color:#fff;font-weight:700;font-size:12px">Guardar</button>
+        <button onclick="openAcapFechasModal('${c.id}','${a.id}')" style="flex:1 1 110px;background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:12px">Fechas</button>
+        <button onclick="openAcapCopyModal('${c.id}','${a.id}')" style="flex:1 1 130px;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:8px 12px;color:#555;font-weight:700;font-size:12px">Copiar fechas</button>
+        <button onclick="copiarAcapAlPortapapeles('${c.id}','${a.id}')" style="flex:1 1 100px;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:8px 12px;color:#555;font-weight:700;font-size:12px">Copiar</button>
+        <button onclick="pegarAcapDesdePortapapeles('${c.id}','${a.id}')" style="flex:1 1 100px;background:${state._acapClipboard?'#effaf3':'#f3f3f3'};border:1px solid ${state._acapClipboard?'#b9e3c6':'#ddd'};border-radius:10px;padding:8px 12px;color:${state._acapClipboard?'#1f7a3f':'#999'};font-weight:700;font-size:12px">Pegar</button>
+        ${tiene?`<button onclick="clearAcap('${c.id}','${a.id}')" style="flex:1 1 100px;background:#fff0f0;border:1px solid #e74c3c;border-radius:10px;padding:8px 12px;color:#e74c3c;font-weight:700;font-size:12px">Borrar</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -614,12 +698,37 @@ function buildAcap(c){
       <div style="font-weight:700;color:var(--accent);font-size:13px;margin-bottom:4px">¿CÓMO FUNCIONA?</div>
       <div style="font-size:12px;color:#555">Cargá empresa y horario por alumno. Al guardar se marca automáticamente como AC en asistencia.</div>
     </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button onclick="openAcapPasteMultiModal('${c.id}')" style="flex:1;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Pegar en varios alumnos</button>
+      <button onclick="exportarAcapCursoExcel('${c.id}')" style="flex:1;background:#eff3ff;border:1px solid #cfe0ff;border-radius:12px;padding:12px;color:var(--accent);font-weight:700;font-size:13px">Exportar Excel</button>
+      <button onclick="crearBackupManualAcap()" style="flex:1;background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Crear backup</button>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label>FECHA DESDE</label>
+          <input type="date" class="inp" value="${state._acapDesde||''}" onchange="setAcapRange(this.value,'${state._acapHasta||''}')"/>
+        </div>
+        <div style="flex:1">
+          <label>FECHA HASTA</label>
+          <input type="date" class="inp" value="${state._acapHasta||''}" onchange="setAcapRange('${state._acapDesde||''}',this.value)"/>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
       <button onclick="setAcapFecha('${addDays(f,-1)}')" style="background:#fff;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)">${ICONS.chevL}</button>
       <input type="date" value="${f}" class="inp" style="flex:1;font-weight:600" onchange="setAcapFecha(this.value)"/>
       <button onclick="setAcapFecha('${addDays(f,1)}')" style="background:#fff;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1)">${ICONS.chevR}</button>
     </div>
-    ${rows}`;
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+      ${Array.from({length:monthDays},(_,idx)=>{
+        const iso = `${currentMonth.getFullYear()}-${p2(currentMonth.getMonth()+1)}-${p2(idx+1)}`;
+        const hasAcap = acapDaysThisMonth.has(iso);
+        const isSelected = iso===f;
+        return `<button onclick="setAcapFecha('${iso}')" style="width:34px;height:34px;border-radius:8px;border:1px solid ${hasAcap?'#f39c12':'#ddd'};background:${isSelected?'#f39c12':hasAcap?'#fff8e1':'#fff'};color:${isSelected?'#fff':hasAcap?'#e67e22':'#888'};font-size:11px;font-weight:800">${idx+1}</button>`;
+      }).join('')}
+    </div>
+    ${rows || `<div style="text-align:center;padding:30px 20px;color:#aaa"><div style="font-size:14px">No hay alumnos para este filtro</div></div>`}`;
 }
 
 // ---- LISTAS TAB ----
@@ -959,6 +1068,7 @@ function buildModal(){
   else if(m==='lista') content = buildModalLista(d);
   else if(m==='acapFechas') content = buildModalAcapFechas(d);
   else if(m==='acapCopy') content = buildModalAcapCopy(d);
+  else if(m==='acapPasteMulti') content = buildModalAcapPasteMulti(d);
   else if(m==='horario') content = buildModalHorario(d);
 
   return `<div class="modal-overlay" onclick="closeModal()">
@@ -979,6 +1089,7 @@ function modalTitle(m,d){
   if(m==='lista') return 'Nueva lista';
   if(m==='acapFechas') return 'ACAP por fechas';
   if(m==='acapCopy') return 'Copiar fechas ACAP';
+  if(m==='acapPasteMulti') return 'Pegar en varios alumnos';
   if(m==='horario') return `${HORAS[d.hora]||''} · ${d.dia||''}`;
   return '';
 }
@@ -1051,6 +1162,18 @@ function buildModalHorario(d){
 
 function buildModalAcapFechas(d){
   const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId) || {};
+  const registros = getAcapEntriesForAlumno(d.cursoId, d.alumnoId, {})
+    .map(({fecha,data:value})=>{
+      return `
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:8px;cursor:pointer">
+          <input type="checkbox" class="acap-fecha-check" value="${fecha}" onchange="actualizarContadorAcapFechas()"/>
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:800;color:#e67e22">${p2(isoToDate(fecha).getDate())}/${p2(isoToDate(fecha).getMonth()+1)}/${isoToDate(fecha).getFullYear()}</div>
+            <div style="font-size:12px;color:var(--primary);margin-top:2px">${esc(value.empresa||'Sin empresa')}</div>
+            <div style="font-size:11px;color:#777;margin-top:2px">${esc(value.horario||'Sin horario')}</div>
+          </div>
+        </label>`;
+    }).join('');
   return `
     <div style="background:#fff8e1;border-radius:12px;padding:12px 14px;margin-bottom:16px">
       <div style="font-size:11px;color:#e67e22;font-weight:700;letter-spacing:.4px">ALUMNO</div>
@@ -1067,10 +1190,28 @@ function buildModalAcapFechas(d){
       <div style="font-size:11px;color:#888;margin-top:8px">Acepta formato dd/mm/aaaa o aaaa-mm-dd.</div>
       <button onclick="guardarAcapFechas()" class="btn-primary" style="margin-top:12px">Guardar fechas</button>
     </div>
-    <div class="card">
+    <div class="card" style="margin-bottom:14px">
       <div style="font-weight:700;color:#888;font-size:12px;margin-bottom:8px">CARGA RÁPIDA DE MES COMPLETO</div>
       <div style="margin-bottom:12px"><label>MES</label><input type="month" class="inp" id="af_mes"/></div>
       <button onclick="cargarAcapMesCompleto()" class="btn-primary">Cargar mes completo</button>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="font-weight:700;color:#888;font-size:12px;margin-bottom:8px">DUPLICAR FECHAS</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <div style="flex:1"><label>MES ORIGEN</label><input type="month" class="inp" id="af_dup_origen"/></div>
+        <div style="flex:1"><label>MES DESTINO</label><input type="month" class="inp" id="af_dup_destino"/></div>
+      </div>
+      <button onclick="duplicarAcapMes()" class="btn-primary">Duplicar fechas</button>
+    </div>
+    <div class="card">
+      <div style="font-weight:700;color:#888;font-size:12px;margin-bottom:8px">FECHAS CARGADAS</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button onclick="seleccionarTodasAcapFechas()" type="button" style="flex:1;background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:10px;color:var(--accent);font-weight:700;font-size:12px">Seleccionar todas</button>
+        <button onclick="deseleccionarTodasAcapFechas()" type="button" style="flex:1;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:10px;color:#555;font-weight:700;font-size:12px">Deseleccionar todas</button>
+      </div>
+      <div id="acapFechasCount" style="font-size:12px;color:#666;font-weight:700;margin-bottom:10px">Fechas seleccionadas: 0</div>
+      <div style="max-height:260px;overflow:auto;margin-bottom:12px">${registros||'<div style="font-size:12px;color:#aaa;text-align:center;padding:16px 10px">No hay fechas cargadas</div>'}</div>
+      <button onclick="eliminarFechasAcapSeleccionadas()" class="btn-ghost" style="background:#fff0f0;color:#e74c3c">Eliminar seleccionadas</button>
     </div>`;
 }
 
@@ -1097,6 +1238,35 @@ function buildModalAcapCopy(d){
     </div>
     <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:16px">Se agregarán todas las fechas ACAP del alumno origen al alumno actual, sin duplicar fechas ya existentes.</div>
     <button onclick="copiarFechasAcapDesdeAlumno()" class="btn-primary">Copiar</button>`;
+}
+
+function buildModalAcapPasteMulti(d){
+  const alumnos = (state.alumnos[d.cursoId]||[])
+    .sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const clipboardName = state._acapClipboard?.alumnoNombre || 'Sin origen';
+  const clipboardCount = state._acapClipboard?.registros?.length || 0;
+
+  const checks = alumnos.map(a=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" class="acap-paste-target" value="${a.id}" onchange="actualizarContadorAcapPaste()" ${state._acapClipboard?.alumnoId===a.id?'disabled':''}/>
+      <span style="font-size:13px;color:${state._acapClipboard?.alumnoId===a.id?'#bbb':'var(--primary)'};font-weight:600">${esc(a.nombre)}</span>
+    </label>
+  `).join('');
+
+  return `
+    <div style="background:#eff3ff;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.4px">PORTAPAPELES ACAP</div>
+      <div style="font-size:14px;color:var(--primary);font-weight:700;margin-top:4px">${esc(clipboardName)}</div>
+      <div style="font-size:12px;color:#666;margin-top:4px">${clipboardCount} fecha${clipboardCount===1?'':'s'} copiada${clipboardCount===1?'':'s'}</div>
+    </div>
+    <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Seleccioná los alumnos del curso donde querés pegar las fechas copiadas. Se agregarán sin reemplazar y sin duplicar.</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button onclick="seleccionarTodosAcapPaste()" type="button" style="flex:1;background:#eff3ff;border:1px solid #cfe0ff;border-radius:10px;padding:10px;color:var(--accent);font-weight:700;font-size:12px">Seleccionar todos</button>
+      <button onclick="deseleccionarTodosAcapPaste()" type="button" style="flex:1;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:10px;padding:10px;color:#555;font-weight:700;font-size:12px">Deseleccionar todos</button>
+    </div>
+    <div id="acapPasteCount" style="font-size:12px;color:#666;font-weight:700;margin-bottom:12px">Seleccionados: 0 alumnos</div>
+    <div style="max-height:320px;overflow:auto;margin-bottom:16px">${checks}</div>
+    <button onclick="pegarAcapEnVariosAlumnos()" class="btn-primary">Pegar en seleccionados</button>`;
 }
 
 // ============================================================
@@ -1128,6 +1298,8 @@ function setAcapFecha(f){
   if(state.cursoActivo) ensureAutoAcapForDate(f, state.cursoActivo);
   state._acapFecha=f; render();
 }
+function setAcapSearch(v){ state._acapSearch=v; render(); }
+function setAcapRange(desde,hasta){ state._acapDesde=desde; state._acapHasta=hasta; render(); }
 function setHorCurso(id){ state._horCurso=id; render(); }
 function setCalFecha(f){ state._calFecha=f; render(); }
 function selDay(iso){ state._selDay=iso; render(); }
@@ -1157,6 +1329,9 @@ function openAcapFechasModal(cursoId, alumnoId){
 function openAcapCopyModal(cursoId, alumnoId){
   setState({modal:'acapCopy', modalData:{cursoId, alumnoId}});
 }
+function openAcapPasteMultiModal(cursoId){
+  setState({modal:'acapPasteMulti', modalData:{cursoId}});
+}
 
 // Color pickers
 function setEvColor(c){ document.getElementById('ev_color').value=c; document.getElementById('evColorPicker').innerHTML=colorPicker(c,'setEvColor'); }
@@ -1179,6 +1354,8 @@ function saveAcap(cursoId, alumnoId){
   upsertAcapRecord(cursoId, alumnoId, f, empresa, horario, false);
   if(horario||empresa){
     setAsist(cursoId,alumnoId,f,'AC');
+    const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+    logAcapHistory('Guardar ACAP', alumno?.nombre||'');
   }
   save(); render();
 }
@@ -1187,6 +1364,8 @@ function clearAcap(cursoId, alumnoId){
   const k=`${cursoId}_${alumnoId}_${f}`;
   delete state.acaps[k];
   setAsist(cursoId,alumnoId,f,null);
+  const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+  logAcapHistory('Borrar ACAP', alumno?.nombre||'');
   save(); render();
 }
 function updateAcap(cursoId, alumnoId, field, val){
@@ -1224,6 +1403,8 @@ function guardarAcapFechas(){
     upsertAcapRecord(d.cursoId, d.alumnoId, fecha, empresa, horario, true);
   });
 
+  const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId);
+  logAcapHistory(`Agregar ${fechas.length} fechas`, alumno?.nombre||'');
   save();
   closeModal();
 }
@@ -1243,8 +1424,77 @@ function cargarAcapMesCompleto(){
     upsertAcapRecord(d.cursoId, d.alumnoId, fecha, empresa, horario, true);
   }
 
+  const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId);
+  logAcapHistory(`Cargar mes completo ${mes}`, alumno?.nombre||'');
   save();
   closeModal();
+}
+function guardarBackupAcapMasivo(){
+  guardarBackupLocalAcap(false);
+}
+function actualizarContadorAcapFechas(){
+  const countEl = document.getElementById('acapFechasCount');
+  if(!countEl) return;
+  const count = [...document.querySelectorAll('.acap-fecha-check:checked')].length;
+  countEl.textContent = `Fechas seleccionadas: ${count}`;
+}
+function seleccionarTodasAcapFechas(){
+  document.querySelectorAll('.acap-fecha-check').forEach(el=>{ el.checked = true; });
+  actualizarContadorAcapFechas();
+}
+function deseleccionarTodasAcapFechas(){
+  document.querySelectorAll('.acap-fecha-check').forEach(el=>{ el.checked = false; });
+  actualizarContadorAcapFechas();
+}
+function eliminarFechasAcapSeleccionadas(){
+  const d = state.modalData || {};
+  const fechas = [...document.querySelectorAll('.acap-fecha-check:checked')].map(el=>el.value).filter(Boolean);
+  if(!d.cursoId || !d.alumnoId || !fechas.length) return;
+  if(!confirm(`Se eliminarán ${fechas.length} fecha${fechas.length===1?'':'s'}. ¿Continuar?`)) return;
+
+  guardarBackupAcapMasivo();
+  fechas.forEach(fecha=>{
+    delete state.acaps[`${d.cursoId}_${d.alumnoId}_${fecha}`];
+    setAsistValue(d.cursoId, d.alumnoId, fecha, null);
+  });
+  const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId);
+  logAcapHistory(`Eliminar ${fechas.length} fechas`, alumno?.nombre||'');
+  save();
+  render();
+}
+function duplicarAcapMes(){
+  const d = state.modalData || {};
+  const origen = document.getElementById('af_dup_origen')?.value || '';
+  const destino = document.getElementById('af_dup_destino')?.value || '';
+  if(!d.cursoId || !d.alumnoId || !origen || !destino || origen===destino) return;
+
+  const [originYear, originMonth] = origen.split('-').map(Number);
+  const [destYear, destMonth] = destino.split('-').map(Number);
+  let copied = 0;
+
+  guardarBackupAcapMasivo();
+  Object.entries(state.acaps).forEach(([key, value])=>{
+    if(!key.startsWith(`${d.cursoId}_${d.alumnoId}_`)) return;
+    const fecha = key.split('_').slice(-1)[0];
+    const fechaObj = isoToDate(fecha);
+    if(fechaObj.getFullYear()!==originYear || fechaObj.getMonth()!==(originMonth-1)) return;
+
+    const day = fechaObj.getDate();
+    if(day > daysInMonth(destYear, destMonth-1)) return;
+    const destFecha = `${destYear}-${p2(destMonth)}-${p2(day)}`;
+    const destKey = `${d.cursoId}_${d.alumnoId}_${destFecha}`;
+    if(state.acaps[destKey]) return;
+
+    state.acaps[destKey] = {...value};
+    setAsistValue(d.cursoId, d.alumnoId, destFecha, 'AC');
+    copied++;
+  });
+
+  const alumno = (state.alumnos[d.cursoId]||[]).find(a=>a.id===d.alumnoId);
+  logAcapHistory(`Duplicar fechas ${origen} -> ${destino}`, alumno?.nombre||'');
+  save();
+  render();
+  alert(`Se duplicaron ${copied} fecha${copied===1?'':'s'}`);
 }
 function copiarFechasAcapDesdeAlumno(){
   const d = state.modalData || {};
@@ -1265,10 +1515,149 @@ function copiarFechasAcapDesdeAlumno(){
     copied++;
   });
 
+  const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===destinoId);
+  logAcapHistory(`Copiar desde otro alumno (${copied})`, alumno?.nombre||'');
   save();
   closeModal();
   render();
   alert(copied ? 'Fechas copiadas correctamente' : 'No había fechas nuevas para copiar');
+}
+function copiarAcapAlPortapapeles(cursoId, alumnoId){
+  const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+  const registros = Object.entries(state.acaps)
+    .filter(([key, value])=>key.startsWith(`${cursoId}_${alumnoId}_`) && value)
+    .map(([key, value])=>({
+      fecha: key.split('_').slice(-1)[0],
+      data: {...value},
+    }));
+
+  state._acapClipboard = {
+    cursoId,
+    alumnoId,
+    alumnoNombre: alumno?.nombre || '',
+    registros,
+  };
+  render();
+  alert(registros.length ? 'Fechas copiadas al portapapeles' : 'El alumno no tiene fechas ACAP para copiar');
+}
+function pegarAcapDesdePortapapeles(cursoId, alumnoId){
+  const clipboard = state._acapClipboard;
+  if(!clipboard || !clipboard.registros?.length){
+    alert('No hay fechas copiadas en el portapapeles');
+    return;
+  }
+
+  let copied = 0;
+  clipboard.registros.forEach(item=>{
+    const destKey = `${cursoId}_${alumnoId}_${item.fecha}`;
+    if(state.acaps[destKey]) return;
+    state.acaps[destKey] = {...item.data};
+    setAsistValue(cursoId, alumnoId, item.fecha, 'AC');
+    copied++;
+  });
+
+  const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+  logAcapHistory(`Pegar desde portapapeles (${copied})`, alumno?.nombre||'');
+  save();
+  render();
+  alert(copied ? 'Fechas pegadas correctamente' : 'No había fechas nuevas para pegar');
+}
+function actualizarContadorAcapPaste(){
+  const countEl = document.getElementById('acapPasteCount');
+  if(!countEl) return;
+  const count = [...document.querySelectorAll('.acap-paste-target:checked')].length;
+  countEl.textContent = `Seleccionados: ${count} alumno${count===1?'':'s'}`;
+}
+function seleccionarTodosAcapPaste(){
+  document.querySelectorAll('.acap-paste-target').forEach(el=>{
+    if(!el.disabled) el.checked = true;
+  });
+  actualizarContadorAcapPaste();
+}
+function deseleccionarTodosAcapPaste(){
+  document.querySelectorAll('.acap-paste-target').forEach(el=>{
+    if(!el.disabled) el.checked = false;
+  });
+  actualizarContadorAcapPaste();
+}
+function pegarAcapEnVariosAlumnos(){
+  const clipboard = state._acapClipboard;
+  const cursoId = state.modalData?.cursoId;
+  if(!clipboard || !clipboard.registros?.length){
+    alert('No hay fechas copiadas en el portapapeles');
+    return;
+  }
+  if(!cursoId){
+    alert('No se pudo identificar el curso');
+    return;
+  }
+
+  const destinos = [...document.querySelectorAll('.acap-paste-target:checked')]
+    .map(el=>el.value)
+    .filter(Boolean);
+  if(!destinos.length){
+    alert('Seleccioná al menos un alumno');
+    return;
+  }
+  if(!confirm(`Se pegarán fechas en ${destinos.length} alumno${destinos.length===1?'':'s'}. ¿Continuar?`)) return;
+
+  let copied = 0;
+  destinos.forEach(alumnoId=>{
+    clipboard.registros.forEach(item=>{
+      const destKey = `${cursoId}_${alumnoId}_${item.fecha}`;
+      if(state.acaps[destKey]) return;
+      state.acaps[destKey] = {...item.data};
+      setAsistValue(cursoId, alumnoId, item.fecha, 'AC');
+      copied++;
+    });
+    const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+    logAcapHistory(`Pegar en varios alumnos`, alumno?.nombre||'');
+  });
+
+  save();
+  closeModal();
+  render();
+  alert(copied ? 'Fechas pegadas correctamente' : 'No había fechas nuevas para pegar');
+}
+function exportarAcapAlumnoPDF(cursoId, alumnoId){
+  const curso = state.cursos.find(c=>c.id===cursoId);
+  const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+  const entries = getAcapEntriesForAlumno(cursoId, alumnoId, {desde:state._acapDesde, hasta:state._acapHasta});
+  const total = entries.length;
+  const rows = entries.map(({fecha,data})=>`
+    <tr>
+      <td>${esc(p2(isoToDate(fecha).getDate())+'/'+p2(isoToDate(fecha).getMonth()+1)+'/'+isoToDate(fecha).getFullYear())}</td>
+      <td>${esc(data.horario || buildHorario(data.horaDesde||'', data.horaHasta||'') || '')}</td>
+      <td>${esc(data.empresa||data.lugar||'')}</td>
+    </tr>
+  `).join('');
+  const win = window.open('', '_blank');
+  if(!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><title>ACAP ${esc(alumno?.nombre||'')}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#222} h1{font-size:20px;margin-bottom:8px} .meta{margin-bottom:16px;font-size:13px;color:#555} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ddd;padding:8px;text-align:left;font-size:12px} th{background:#f4f6fb}</style></head><body><h1>${esc(alumno?.nombre||'')}</h1><div class="meta">Curso: ${esc(curso?.nombre||'')}<br/>Total de días ACAP: ${total}</div><table><thead><tr><th>Fecha</th><th>Horario</th><th>Empresa</th></tr></thead><tbody>${rows || '<tr><td colspan="3">Sin registros</td></tr>'}</tbody></table></body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+function exportarAcapCursoExcel(cursoId){
+  const curso = state.cursos.find(c=>c.id===cursoId);
+  const rows = getAcapRowsForCurso(cursoId, {desde:state._acapDesde, hasta:state._acapHasta, search:state._acapSearch});
+  const htmlRows = rows.map(({alumno,fecha,data})=>{
+    const h = parseHorarioData(data);
+    return `<tr><td>${esc(alumno?.nombre||'')}</td><td>${esc(fecha)}</td><td>${esc(h.horaDesde||'')}</td><td>${esc(h.horaHasta||'')}</td><td>${esc(data.empresa||'')}</td></tr>`;
+  }).join('');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body><table><tr><th>Alumno</th><th>Fecha</th><th>Hora desde</th><th>Hora hasta</th><th>Empresa</th></tr>${htmlRows}</table></body></html>`;
+  const blob = new Blob([html], {type:'application/vnd.ms-excel'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${sanitizeFileName(curso?.nombre||'curso')}_acap_${todayISO()}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function crearBackupManualAcap(){
+  guardarBackupLocalAcap(true);
 }
 
 // Toggle expand asistencia row
@@ -1498,6 +1887,11 @@ function importarBackup(event){
       state = data;
       if(!state._listaCols) state._listaCols = ['','',''];
       if(!state._acapOpen) state._acapOpen = {};
+      if(!state._acapClipboard) state._acapClipboard = null;
+      if(typeof state._acapSearch === 'undefined') state._acapSearch = '';
+      if(typeof state._acapDesde === 'undefined') state._acapDesde = '';
+      if(typeof state._acapHasta === 'undefined') state._acapHasta = '';
+      if(!state.acapHistorial) state.acapHistorial = [];
       if(typeof state.modal === 'undefined') state.modal = null;
       if(typeof state.modalData === 'undefined') state.modalData = {};
       save();
