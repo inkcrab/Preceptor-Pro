@@ -157,6 +157,7 @@ let state = {
   eventos: S.get('pp_eventos', []),
   notas: S.get('pp_notas', []),
   listas: S.get('pp_listas', {}),
+  listasGlobales: S.get('pp_listas_globales', []),
   acapHistorial: S.get('pp_acap_hist', []),
   asistObs: S.get('pp_asist_obs', {}),
   colors: S.get('pp_colors', {primary:'#1a1a2e', accent:'#4361ee', bg:'#f4f6fb'}),
@@ -169,6 +170,7 @@ let state = {
   fechaAsist: toISO(new Date()),
   vistaAsist: 'dia',
   _listaActiva: null,
+  _listaModo: 'curso',
   _listaCols: ['','',''],
   _acapOpen: {},
   _acapClipboard: null,
@@ -202,6 +204,7 @@ function save(){
   S.set('pp_eventos',state.eventos);
   S.set('pp_notas',state.notas);
   S.set('pp_listas',state.listas);
+  S.set('pp_listas_globales',state.listasGlobales);
   S.set('pp_acap_hist',state.acapHistorial);
   S.set('pp_asist_obs',state.asistObs);
   S.set('pp_colors',state.colors);
@@ -229,7 +232,7 @@ function fmtFecha(iso){const d=isoToDate(iso);const days=["Domingo","Lunes","Mar
 function startOfWeek(iso){const d=isoToDate(iso);const day=d.getDay();const diff=day===0?-6:1-day;d.setDate(d.getDate()+diff);return toISO(d);}
 function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
 function todayISO(){return toISO(new Date());}
-function saludo(){const h=new Date().getHours();if(h<12)return'Buen día';if(h<20)return'Buenas tardes';return'Buenas noches';}
+function saludo(){const h=new Date().getHours();if(h>=6&&h<13)return'Buen día';if(h>=13&&h<20)return'Buenas tardes';return'Buenas noches';}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function uid(){return '_'+Math.random().toString(36).slice(2);}
 function normalizeDia(d){return String(d||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
@@ -545,26 +548,55 @@ function buildHome(){
   const emoji = h<12?'🌅':h<20?'☀️':'🌙';
   const ferHoy = FERIADOS.find(f=>f.fecha===hoy);
   const evsHoy = state.eventos.filter(e=>e.fecha===hoy);
-  const evsManana = state.eventos.filter(e=>e.fecha===addDays(hoy,1));
-  const acapsHoy = Object.keys(state.acaps).filter(k=>k.endsWith('_'+hoy)&&state.acaps[k]);
+  const acapsHoy = [...new Set(Object.keys(state.acaps).filter(k=>k.endsWith('_'+hoy)&&state.acaps[k]).map(k=>k.split('_').slice(0,2).join('_')))];
   const proxEvs = state.eventos.filter(e=>{
-    const d=isoToDate(e.fecha)-new Date();
-    return d>0 && d<7*86400000;
-  }).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const diff = Math.round((isoToDate(e.fecha)-isoToDate(hoy))/86400000);
+    return diff>=1 && diff<=7;
+  }).sort((a,b)=>a.fecha.localeCompare(b.fecha) || (a.titulo||'').localeCompare(b.titulo||''));
   const notasDest = notasImportantes();
   const ausentesHoy = totalAusentesHoy();
+  const seenNotif = new Set();
+  const pushNotif = htmlKey=>{
+    const [key, html] = htmlKey;
+    if(seenNotif.has(key)) return '';
+    seenNotif.add(key);
+    return html;
+  };
 
-  let notifs = '';
-  if(ferHoy) notifs += `<div class="notif" style="background:#fff0f0;border-left:4px solid #e74c3c"><span style="font-size:22px">🎉</span><div><div style="font-weight:700;color:#c0392b;font-size:14px">HOY · ${esc(ferHoy.nombre)}</div><div style="font-size:12px;color:#e74c3c">Feriado Nacional · Sin actividad escolar</div></div></div>`;
-  evsHoy.forEach(ev=>{notifs+=`<div class="notif" style="background:#f0f4ff;border-left:4px solid ${ev.color||'var(--accent)'}"><span style="font-size:22px">📌</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">HOY · ${esc(ev.titulo)}</div>${ev.hora?`<div style="font-size:12px;color:#666">${esc(ev.hora)}${ev.lugar?' · '+esc(ev.lugar):''}</div>`:''}</div></div>`;});
-  if(evsManana.length) notifs+=`<div class="notif" style="background:#f4fbff;border-left:4px solid #2980b9"><span style="font-size:22px">🗓️</span><div><div style="font-weight:700;color:#2980b9;font-size:14px">MAÑANA · ${evsManana.length} evento${evsManana.length===1?'':'s'}</div></div></div>`;
-  if(acapsHoy.length) notifs+=`<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP · ${acapsHoy.length} alumno${acapsHoy.length>1?'s':''} en pasantía hoy</div></div></div>`;
-  if(ausentesHoy) notifs+=`<div class="notif" style="background:#fff5f5;border-left:4px solid #e74c3c"><span style="font-size:22px">🚨</span><div><div style="font-weight:700;color:#e74c3c;font-size:14px">AUSENTES HOY · ${ausentesHoy}</div></div></div>`;
-  proxEvs.slice(0,2).forEach(ev=>{
-    const diff=Math.round((isoToDate(ev.fecha)-new Date())/86400000);
-    notifs+=`<div class="notif" style="background:#f8f9fa;border-left:4px solid ${ev.color||'#aaa'}"><span style="font-size:22px">🔔</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">${diff===1?'MAÑANA':'EN '+diff+' DÍAS'} · ${esc(ev.titulo)}</div>${ev.hora?`<div style="font-size:12px;color:#666">${esc(ev.hora)}</div>`:''}</div></div>`;
+  const notifsHoy = [];
+  const notifsProx = [];
+  if(acapsHoy.length) notifsHoy.push(pushNotif([
+    `acap_${hoy}`,
+    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP hoy: ${acapsHoy.length} alumno${acapsHoy.length===1?'':'s'}</div></div></div>`
+  ]));
+  if(ferHoy) notifsHoy.push(pushNotif([
+    `feriado_${ferHoy.fecha}`,
+    `<div class="notif" style="background:#fff0f0;border-left:4px solid #e74c3c"><span style="font-size:22px">🎉</span><div><div style="font-weight:700;color:#c0392b;font-size:14px">HOY · ${esc(ferHoy.nombre)}</div><div style="font-size:12px;color:#e74c3c">Feriado Nacional · Sin actividad escolar</div></div></div>`
+  ]));
+  evsHoy.forEach(ev=>{
+    notifsHoy.push(pushNotif([
+      `hoy_${ev.id||`${ev.fecha}_${ev.titulo}`}`,
+      `<div class="notif" style="background:#f0f4ff;border-left:4px solid ${ev.color||'var(--accent)'}"><span style="font-size:22px">📌</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">HOY · ${esc(ev.titulo)}</div>${ev.hora?`<div style="font-size:12px;color:#666">${esc(ev.hora)}${ev.lugar?' · '+esc(ev.lugar):''}</div>`:''}</div></div>`
+    ]));
   });
-  notasDest.slice(0,2).forEach(n=>{notifs+=`<div class="notif" style="background:#fff;border-left:4px solid ${n.color||'var(--accent)'};box-shadow:0 1px 6px rgba(0,0,0,.07)"><span style="font-size:22px">⭐</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">${esc(n.titulo||n.contenido.slice(0,40))}</div><div style="font-size:12px;color:#888">Nota importante</div></div></div>`;});
+  if(ausentesHoy) notifsHoy.push(pushNotif([
+    `ausentes_${hoy}`,
+    `<div class="notif" style="background:#fff5f5;border-left:4px solid #e74c3c"><span style="font-size:22px">🚨</span><div><div style="font-weight:700;color:#e74c3c;font-size:14px">AUSENTES HOY · ${ausentesHoy}</div></div></div>`
+  ]));
+  proxEvs.forEach(ev=>{
+    const diff=Math.round((isoToDate(ev.fecha)-isoToDate(hoy))/86400000);
+    notifsProx.push(pushNotif([
+      `prox_${ev.id||`${ev.fecha}_${ev.titulo}`}`,
+      `<div class="notif" style="background:#f8f9fa;border-left:4px solid ${ev.color||'#aaa'}"><span style="font-size:22px">🔔</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">${esc(ev.titulo)}</div><div style="font-size:12px;color:#666">Faltan ${diff} día${diff===1?'':'s'}${ev.hora?` · ${esc(ev.hora)}`:''}</div></div></div>`
+    ]));
+  });
+  notasDest.slice(0,2).forEach(n=>{
+    notifsHoy.push(pushNotif([
+      `nota_${n.id||n.fechaCreada||n.titulo||n.contenido}`,
+      `<div class="notif" style="background:#fff;border-left:4px solid ${n.color||'var(--accent)'};box-shadow:0 1px 6px rgba(0,0,0,.07)"><span style="font-size:22px">⭐</span><div><div style="font-weight:700;color:var(--primary);font-size:14px">${esc(n.titulo||n.contenido.slice(0,40))}</div><div style="font-size:12px;color:#888">Nota importante</div></div></div>`
+    ]));
+  });
+  const notifs = [...notifsHoy.filter(Boolean), ...notifsProx.filter(Boolean)].join('');
 
   let cursosHtml = state.cursos.map(c=>{
     const als = state.alumnos[c.id]||[];
@@ -596,17 +628,13 @@ function buildHome(){
         <button style="background:none;border:none;padding:4px" onclick="goScreen('perfil')">${ICONS.user}</button>
       </div>
     </div>
-    ${notifs}
+    <div style="margin-bottom:14px">
+      <div style="font-weight:800;font-size:18px;color:var(--primary);margin-bottom:10px">Notificaciones importantes</div>
+      ${notifs || `<div class="card" style="text-align:center;color:#999">No hay notificaciones importantes por hoy.</div>`}
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;margin-top:8px">
       <div><div style="font-weight:800;font-size:18px;color:var(--primary)">Mis Cursos</div><div style="font-size:12px;color:#888">Gestión de asistencia y novedades</div></div>
       <button style="background:none;border:none;color:var(--accent);font-weight:700;font-size:13px" onclick="openModal('curso')">+ Nuevo</button>
-    </div>
-    <div class="card" style="display:flex;justify-content:space-between;align-items:center;background:#fff8e1;border-left:5px solid #f39c12">
-      <div>
-        <div style="font-size:11px;color:#e67e22;font-weight:700;letter-spacing:.4px">ACAP HOY</div>
-        <div style="font-size:13px;color:#7a5a00;margin-top:4px">Alumnos con ACAP en la fecha actual</div>
-      </div>
-      <div style="font-size:30px;font-weight:900;color:#e67e22;min-width:40px;text-align:right">${acapsHoy.length}</div>
     </div>
     ${cursosHtml}
     <div style="font-weight:800;font-size:16px;color:var(--primary);margin-bottom:12px;margin-top:4px">Accesos Rápidos</div>
@@ -870,14 +898,18 @@ function buildAcap(c){
   }).join('');
 
   return `
-    <div style="background:#eff3ff;border-radius:12px;padding:12px 14px;margin-bottom:16px">
-      <div style="font-weight:700;color:var(--accent);font-size:13px;margin-bottom:4px">¿CÓMO FUNCIONA?</div>
-      <div style="font-size:12px;color:#555">Cargá empresa y horario por alumno. Al guardar se marca automáticamente como AC en asistencia.</div>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button onclick="openAcapPasteMultiModal('${c.id}')" style="flex:1;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Pegar en varios alumnos</button>
-      <button onclick="exportarAcapCursoExcel('${c.id}')" style="flex:1;background:#eff3ff;border:1px solid #cfe0ff;border-radius:12px;padding:12px;color:var(--accent);font-weight:700;font-size:13px">Exportar Excel</button>
-      <button onclick="crearBackupManualAcap()" style="flex:1;background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Crear backup</button>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-weight:800;color:var(--primary);font-size:16px">ACAP del curso</div>
+          <div style="font-size:12px;color:#555;margin-top:4px">Cargá empresa y horario por alumno. Al guardar se marca automáticamente como AC en asistencia.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="openAcapPasteMultiModal('${c.id}')" style="flex:1 1 160px;background:#f8f9fa;border:1px solid #dcdfe6;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Pegar en varios alumnos</button>
+        <button onclick="exportarAcapCursoExcel('${c.id}')" style="flex:1 1 140px;background:#eff3ff;border:1px solid #cfe0ff;border-radius:12px;padding:12px;color:var(--accent);font-weight:700;font-size:13px">Exportar Excel</button>
+        <button onclick="crearBackupManualAcap()" style="flex:1 1 140px;background:#fff;border:1px solid #ddd;border-radius:12px;padding:12px;color:#555;font-weight:700;font-size:13px">Crear backup</button>
+      </div>
     </div>
     <div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div style="font-size:13px;color:#555;font-weight:700">Alumnos con ACAP: ${totalConAcap}</div>
@@ -918,11 +950,16 @@ function buildListas(c){
     return buildListaDetalle(c);
   }
   const lsts = state.listas[c.id]||[];
-  let html = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  const globalLists = state.listasGlobales||[];
+  let html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px">
     <span style="font-weight:700;font-size:15px;color:var(--primary)">Listas personalizadas</span>
-    <button style="background:var(--accent);border:none;border-radius:10px;padding:8px 14px;color:#fff;font-weight:700;font-size:13px" onclick="openModal('lista')">+ Nueva</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button style="background:#eff3ff;border:none;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:13px" onclick="openModal('lista',{modo:'global'})">+ Global</button>
+      <button style="background:var(--accent);border:none;border-radius:10px;padding:8px 14px;color:#fff;font-weight:700;font-size:13px" onclick="openModal('lista',{modo:'curso'})">+ Nueva</button>
+    </div>
   </div>`;
-  if(!lsts.length) html+=`<div style="text-align:center;padding:40px 20px;color:#aaa"><div style="font-size:40px">📋</div><div style="margin-top:12px;font-size:14px">No hay listas todavía</div><div style="font-size:12px;margin-top:4px">Tocá + Nueva para crear una</div></div>`;
+  html += `<div style="font-size:12px;color:#888;font-weight:700;margin-bottom:10px">LISTAS DEL CURSO</div>`;
+  if(!lsts.length) html+=`<div style="text-align:center;padding:24px 20px;color:#aaa"><div style="font-size:32px">📋</div><div style="margin-top:10px;font-size:14px">No hay listas de este curso</div></div>`;
   lsts.forEach((l,i)=>{
     const totalChecks = Object.values(l.checks||{}).filter(Boolean).length;
     const totalPosibles = (state.alumnos[c.id]||[]).length * (l.columnas||[]).length;
@@ -938,27 +975,57 @@ function buildListas(c){
       </div>
     </div>`;
   });
+  html += `<div style="font-size:12px;color:#888;font-weight:700;margin:18px 0 10px">LISTAS GLOBALES</div>`;
+  if(!globalLists.length) html+=`<div style="text-align:center;padding:24px 20px;color:#aaa"><div style="font-size:32px">🌐</div><div style="margin-top:10px;font-size:14px">No hay listas globales</div></div>`;
+  globalLists.forEach((l,i)=>{
+    const totalChecks = Object.values(l.checks||{}).filter(Boolean).length;
+    const totalPosibles = (l.miembros||[]).length * (l.columnas||[]).length;
+    html+=`<div class="card" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="setListaActiva({modo:'global',index:${i}})">
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--primary);font-size:14px">${esc(l.nombre)}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px">${(l.columnas||[]).join(' · ')}</div>
+        <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${(l.miembros||[]).length} alumnos · ${totalChecks} / ${totalPosibles} marcados</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="event.stopPropagation();borrarListaGlobal(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
+        <span style="color:#ccc">${ICONS.chevR}</span>
+      </div>
+    </div>`;
+  });
   return html;
 }
 
 function buildListaDetalle(c){
-  const i = state._listaActiva;
-  const lista = (state.listas[c.id]||[])[i];
+  const active = state._listaActiva;
+  const isGlobal = typeof active === 'object' && active?.modo === 'global';
+  const i = isGlobal ? active.index : active;
+  const lista = isGlobal ? (state.listasGlobales||[])[i] : (state.listas[c.id]||[])[i];
   if(!lista) return '';
-  const als = state.alumnos[c.id]||[];
-  const thead = `<tr style="background:#f4f6fb"><th style="text-align:left;padding:8px;font-size:11px;color:#888;font-weight:700">ALUMNO</th>${(lista.columnas||[]).map(col=>`<th style="padding:8px;text-align:center;font-size:11px;color:#888;font-weight:700;min-width:80px">${esc(col)}</th>`).join('')}</tr>`;
-  const tbody = als.map((a,ai)=>{
+  const miembros = isGlobal
+    ? (lista.miembros||[])
+        .map(ref=>{
+          const curso = state.cursos.find(x=>x.id===ref.cursoId);
+          const alumno = (state.alumnos[ref.cursoId]||[]).find(a=>a.id===ref.alumnoId);
+          return alumno && curso ? {curso, alumno} : null;
+        })
+        .filter(Boolean)
+    : (state.alumnos[c.id]||[]).map(alumno=>({curso:c, alumno}));
+  const thead = `<tr style="background:#f4f6fb"><th style="text-align:left;padding:8px;font-size:11px;color:#888;font-weight:700">ALUMNO</th>${isGlobal?`<th style="text-align:left;padding:8px;font-size:11px;color:#888;font-weight:700">CURSO</th>`:''}${(lista.columnas||[]).map(col=>`<th style="padding:8px;text-align:center;font-size:11px;color:#888;font-weight:700;min-width:80px">${esc(col)}</th>`).join('')}</tr>`;
+  const tbody = miembros.map(({curso, alumno},ai)=>{
     const celdas = (lista.columnas||[]).map((_,ci)=>{
-      const k=`${a.id}_${ci}`;
+      const k=isGlobal?`${curso.id}_${alumno.id}_${ci}`:`${alumno.id}_${ci}`;
       const checked=(lista.checks||{})[k];
-      return `<td style="padding:10px 8px;text-align:center"><button onclick="toggleCheck('${c.id}',${i},'${k}')" style="width:26px;height:26px;border-radius:6px;border:2px solid ${checked?'#27ae60':'#ccc'};background:${checked?'#27ae60':'#fff'};display:flex;align-items:center;justify-content:center;margin:0 auto;color:#fff">${checked?ICONS.check:''}</button></td>`;
+      return `<td style="padding:10px 8px;text-align:center"><button onclick="toggleCheck('${isGlobal?'global':c.id}',${i},'${k}')" style="width:26px;height:26px;border-radius:6px;border:2px solid ${checked?'#27ae60':'#ccc'};background:${checked?'#27ae60':'#fff'};display:flex;align-items:center;justify-content:center;margin:0 auto;color:#fff">${checked?ICONS.check:''}</button></td>`;
     }).join('');
-    return `<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:10px 8px;font-size:13px;font-weight:600;color:var(--primary)">${ai+1}. ${esc(a.nombre)}</td>${celdas}</tr>`;
+    return `<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:10px 8px;font-size:13px;font-weight:600;color:var(--primary)">${ai+1}. ${esc(alumno.nombre)}</td>${isGlobal?`<td style="padding:10px 8px;font-size:12px;color:#666">${esc(curso.nombre)}</td>`:''}${celdas}</tr>`;
   }).join('');
 
   return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
     <button class="back-btn" onclick="setListaActiva(null)">${ICONS.back}</button>
-    <span style="font-weight:800;font-size:16px;color:var(--primary)">${esc(lista.nombre)}</span>
+    <div>
+      <div style="font-weight:800;font-size:16px;color:var(--primary)">${esc(lista.nombre)}</div>
+      <div style="font-size:11px;color:#888;font-weight:700">${isGlobal?'LISTA GLOBAL':'LISTA DEL CURSO'}</div>
+    </div>
   </div>
   <div class="tbl-wrap"><table>${thead}<tbody>${tbody}</tbody></table></div>`;
 }
@@ -1392,13 +1459,29 @@ function buildModalCurso(d){
 
 function buildModalLista(d){
   const cols = state._listaCols||['','',''];
+  const modo = d?.modo==='global' ? 'global' : 'curso';
   return `
     <div style="margin-bottom:12px"><label>NOMBRE DE LA LISTA *</label><input class="inp" id="lista_nombre" placeholder="Ej: Salida al museo"/></div>
+    <div style="margin-bottom:12px"><label>TIPO</label><div style="font-size:13px;color:${modo==='global'?'#e67e22':'#555'};font-weight:700">${modo==='global'?'Lista global':'Lista por curso'}</div></div>
     <div style="margin-bottom:12px"><label>COLUMNAS (una por check)</label>
       <div id="listaCols">${cols.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px"><input class="inp lista-col" placeholder="Ej: Autorización" value="${esc(c)}"/>${cols.length>1?`<button onclick="removeCol(${i})" style="background:none;border:none;color:#e74c3c;padding:4px">${ICONS.x}</button>`:''}</div>`).join('')}</div>
       <button onclick="addCol()" style="background:#f0f0f0;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:#555">+ Agregar columna</button>
     </div>
-    <button onclick="guardarLista()" class="btn-primary" style="margin-top:8px">Crear lista</button>`;
+    ${modo==='global' ? `
+    <div style="margin-bottom:14px"><label>ALUMNOS</label>
+      <div style="font-size:12px;color:#777;margin-bottom:10px">Seleccioná alumnos de distintos cursos.</div>
+      <div style="max-height:320px;overflow:auto;border:1px solid #eee;border-radius:12px;padding:10px;background:#fafafa">
+        ${state.cursos.map(c=>`
+          <details style="margin-bottom:8px" ${c.id===state.cursoActivo?'open':''}>
+            <summary style="cursor:pointer;font-weight:700;color:var(--primary);font-size:13px;padding:6px 2px">${esc(c.nombre)}</summary>
+            <div style="padding:8px 4px 4px">
+              ${(state.alumnos[c.id]||[]).sort((a,b)=>a.nombre.localeCompare(b.nombre)).map(a=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 6px;background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:6px;cursor:pointer"><input type="checkbox" class="lista-global-alumno" value="${c.id}__${a.id}"/><span style="font-size:13px;color:#333">${esc(a.nombre)}</span></label>`).join('') || '<div style="font-size:12px;color:#aaa;padding:8px 4px">Sin alumnos</div>'}
+            </div>
+          </details>
+        `).join('')}
+      </div>
+    </div>` : ''}
+    <button onclick="guardarLista('${modo}')" class="btn-primary" style="margin-top:8px">Crear lista</button>`;
 }
 
 function buildModalHorario(d){
@@ -2053,13 +2136,26 @@ function importarLista(cursoId){
 }
 
 // Listas
-function guardarLista(){
+function guardarLista(modo){
   const nombre = document.getElementById('lista_nombre')?.value?.trim();
   if(!nombre) return;
   const cols = [...document.querySelectorAll('.lista-col')].map(i=>i.value.trim()).filter(Boolean);
   if(!cols.length) return;
-  const cursoId = state.cursoActivo;
-  state.listas[cursoId]=[...(state.listas[cursoId]||[]),{nombre,columnas:cols,checks:{}}];
+  if(modo==='global'){
+    const miembros = [...new Set(
+      [...document.querySelectorAll('.lista-global-alumno:checked')]
+        .map(el=>el.value)
+        .filter(Boolean)
+    )].map(v=>{
+      const [cursoId, alumnoId] = v.split('__');
+      return {cursoId, alumnoId};
+    }).filter(x=>x.cursoId && x.alumnoId);
+    if(!miembros.length) return;
+    state.listasGlobales = [...(state.listasGlobales||[]), {id:uid(), nombre, columnas:cols, checks:{}, miembros}];
+  } else {
+    const cursoId = state.cursoActivo;
+    state.listas[cursoId]=[...(state.listas[cursoId]||[]),{nombre,columnas:cols,checks:{}}];
+  }
   state._listaActiva = null;
   save(); closeModal();
 }
@@ -2069,12 +2165,25 @@ function borrarLista(i){
   state.listas[cursoId]=(state.listas[cursoId]||[]).filter((_,j)=>j!==i);
   save(); render();
 }
+function borrarListaGlobal(i){
+  if(!confirm('¿Borrar lista global?')) return;
+  state.listasGlobales=(state.listasGlobales||[]).filter((_,j)=>j!==i);
+  save(); render();
+}
 function toggleCheck(cursoId,listaIdx,key){
-  const lsts=[...(state.listas[cursoId]||[])];
-  const l={...lsts[listaIdx]};
-  l.checks={...(l.checks||{}),[key]:!(l.checks||{})[key]};
-  lsts[listaIdx]=l;
-  state.listas[cursoId]=lsts;
+  if(cursoId==='global'){
+    const lsts=[...(state.listasGlobales||[])];
+    const l={...lsts[listaIdx]};
+    l.checks={...(l.checks||{}),[key]:!(l.checks||{})[key]};
+    lsts[listaIdx]=l;
+    state.listasGlobales=lsts;
+  } else {
+    const lsts=[...(state.listas[cursoId]||[])];
+    const l={...lsts[listaIdx]};
+    l.checks={...(l.checks||{}),[key]:!(l.checks||{})[key]};
+    lsts[listaIdx]=l;
+    state.listas[cursoId]=lsts;
+  }
   save(); render();
 }
 function addCol(){
@@ -2292,8 +2401,9 @@ function importarBackup(event){
       const data = JSON.parse(e.target?.result || '{}');
       if(!data || typeof data !== 'object') throw new Error('invalid');
       state = data;
-      if(!state._listaCols) state._listaCols = ['','',''];
-      if(!state._acapOpen) state._acapOpen = {};
+	      if(!state._listaCols) state._listaCols = ['','',''];
+	      if(typeof state._listaModo === 'undefined') state._listaModo = 'curso';
+	      if(!state._acapOpen) state._acapOpen = {};
       if(!state._acapClipboard) state._acapClipboard = null;
       if(typeof state._acapSearch === 'undefined') state._acapSearch = '';
       if(typeof state._acapDesde === 'undefined') state._acapDesde = '';
@@ -2310,6 +2420,7 @@ function importarBackup(event){
 	      if(!state.acapHistorial) state.acapHistorial = [];
 	      if(typeof state._notasSearch === 'undefined') state._notasSearch = '';
 	      if(typeof state._notasOnlyImportant === 'undefined') state._notasOnlyImportant = false;
+	      if(!state.listasGlobales) state.listasGlobales = [];
 	      state.notas = (state.notas||[]).map(n=>({importante:false,fija:false,...n}));
 	      if(typeof state.modal === 'undefined') state.modal = null;
 	      if(typeof state.modalData === 'undefined') state.modalData = {};
@@ -2334,15 +2445,6 @@ window.addEventListener('offline', ()=>{state._online=false; render();});
 setInterval(()=>{
   if(state.screen==='home' && !state.modal) render();
 }, 60000);
-const lastCourseId = S.get('pp_last_course', null);
-if(lastCourseId && (state.cursos||[]).some(c=>c.id===lastCourseId)){
-  ensureDefaultPresentForDate(lastCourseId, todayISO());
-  state.screen='curso';
-  state.cursoActivo=lastCourseId;
-  state.cursoTab='asistencia';
-  state.fechaAsist=todayISO();
-  state._acapFecha=todayISO();
-}
 render();
 </script>
 </body>
