@@ -81,9 +81,11 @@
   <!-- Rendered by JS -->
 </div>
 <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
+<input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="subirFotoPerfil(event)"/>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-storage-compat.js"></script>
 
 <script>
 // ============================================================
@@ -120,9 +122,13 @@ const HORAS = ["12:30 - 13:10","13:10 - 13:50","13:50 - 14:30","14:40 - 15:20","
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
 const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
+const SUPPORT_EMAIL = 'TU_EMAIL';
+const SUPPORT_WHATSAPP = 'TU_NUMERO';
 const AUTH_USERS_KEY = 'pp_auth_users';
 const AUTH_ACTIVE_KEY = 'pp_auth_active';
-const APP_DATA_KEYS = ['pp_perfil','pp_cursos','pp_alumnos','pp_asist','pp_acaps','pp_hor','pp_horas_inst','pp_eventos','pp_notas','pp_listas','pp_listas_globales','pp_acap_hist','pp_asist_obs','pp_colors','pp_fast_mode','pp_last_modified','pp_user_profile'];
+const AUTH_ACTIVE_SESSION_KEY = 'pp_auth_active_session';
+const AUTH_PERSIST_KEY = 'pp_auth_persist';
+const APP_DATA_KEYS = ['pp_perfil','pp_cursos','pp_alumnos','pp_asist','pp_acaps','pp_hor','pp_horas_inst','pp_eventos','pp_notas','pp_listas','pp_listas_globales','pp_acap_hist','pp_asist_obs','pp_colors','pp_fast_mode','pp_last_modified','pp_user_profile','pp_plan'];
 const firebaseConfig = {
   apiKey: "AIzaSyB3L7CiwRYrOD6isSPm3XCy0k76GfoYPsA",
   authDomain: "preceptor-pro-97caa.firebaseapp.com",
@@ -133,16 +139,51 @@ const firebaseConfig = {
 };
 
 function getStoredUsers(){ try{return JSON.parse(localStorage.getItem(AUTH_USERS_KEY)||'[]');}catch{return [];} }
-function getActiveUser(){ try{return JSON.parse(localStorage.getItem(AUTH_ACTIVE_KEY)||'null');}catch{return null;} }
-function setActiveUser(user){ try{localStorage.setItem(AUTH_ACTIVE_KEY, JSON.stringify(user));}catch{} }
-function clearActiveUser(){ try{localStorage.removeItem(AUTH_ACTIVE_KEY);}catch{} }
+function getAuthPersistencePreference(){
+  try{return localStorage.getItem(AUTH_PERSIST_KEY) || sessionStorage.getItem(AUTH_PERSIST_KEY) || 'local';}catch{return 'local';}
+}
+function setAuthPersistencePreference(remember){
+  try{
+    if(remember){
+      localStorage.setItem(AUTH_PERSIST_KEY, 'local');
+      sessionStorage.removeItem(AUTH_PERSIST_KEY);
+    } else {
+      sessionStorage.setItem(AUTH_PERSIST_KEY, 'session');
+      localStorage.removeItem(AUTH_PERSIST_KEY);
+    }
+  }catch{}
+}
+function getActiveUser(){
+  try{
+    return JSON.parse(sessionStorage.getItem(AUTH_ACTIVE_SESSION_KEY)||localStorage.getItem(AUTH_ACTIVE_KEY)||'null');
+  }catch{return null;}
+}
+function setActiveUser(user, remember=getAuthPersistencePreference()!=='session'){
+  try{
+    if(remember){
+      localStorage.setItem(AUTH_ACTIVE_KEY, JSON.stringify(user));
+      sessionStorage.removeItem(AUTH_ACTIVE_SESSION_KEY);
+    } else {
+      sessionStorage.setItem(AUTH_ACTIVE_SESSION_KEY, JSON.stringify(user));
+      localStorage.removeItem(AUTH_ACTIVE_KEY);
+    }
+  }catch{}
+}
+function clearActiveUser(){
+  try{
+    localStorage.removeItem(AUTH_ACTIVE_KEY);
+    sessionStorage.removeItem(AUTH_ACTIVE_SESSION_KEY);
+  }catch{}
+}
 let activeUser = getActiveUser();
 let firebaseApp = null;
 let firebaseAuth = null;
 let firestoreDb = null;
+let storageDb = null;
 let authReady = true;
 let firebaseEnabled = false;
 let firestoreEnabled = false;
+let storageEnabled = false;
 let remoteSaveTimer = null;
 let cloudStatusTimer = null;
 let remoteHydrating = false;
@@ -168,13 +209,16 @@ function initFirebaseAuth(){
     firebaseApp = firebase.apps?.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
     firebaseAuth = firebase.auth();
     firestoreDb = typeof firebase.firestore === 'function' ? firebase.firestore() : null;
+    storageDb = typeof firebase.storage === 'function' ? firebase.storage() : null;
     firebaseEnabled = true;
     firestoreEnabled = !!firestoreDb;
+    storageEnabled = !!storageDb;
     return true;
   }catch(err){
     console.error('Firebase init error', err);
     firebaseEnabled = false;
     firestoreEnabled = false;
+    storageEnabled = false;
     return false;
   }
 }
@@ -186,7 +230,7 @@ function syncActiveUserFromFirebase(user){
       nombre: user.displayName || user.email || 'Usuario'
     };
     migrateLegacyDataToUser(activeUser.email);
-    setActiveUser(activeUser);
+    setActiveUser(activeUser, getAuthPersistencePreference()!=='session');
     state.userProfile = {
       ...(state.userProfile||{}),
       uid: activeUser.uid,
@@ -261,6 +305,7 @@ const S = {
 let state = {
   perfil: S.get('pp_perfil', {nombre:'Preceptor/a', escuela:'Mi Escuela', turno:'Mañana'}),
   userProfile: S.get('pp_user_profile', {nombre: activeUser?.nombre||'', email: activeUser?.email||'', uid: activeUser?.uid||''}),
+  plan: S.get('pp_plan', 'free'),
   cursos: S.get('pp_cursos', [
     {id:'c1',nombre:'5° A BOEA',orientacion:'Economía y Administración',color:'#6C63FF'},
     {id:'c2',nombre:'5° B BOEA',orientacion:'Economía y Administración',color:'#C0392B'},
@@ -321,6 +366,7 @@ let state = {
   _notasSearch: '',
   _notasOnlyImportant: false,
   _authMode: 'login',
+  _rememberLogin: getAuthPersistencePreference()!=='session',
   _cloudStatus: 'local',
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
@@ -333,6 +379,7 @@ let state = {
 const PERSIST_DEFAULTS = {
   perfil: deepCopy(state.perfil),
   userProfile: deepCopy(state.userProfile),
+  plan: state.plan,
   cursos: deepCopy(state.cursos),
   alumnos: deepCopy(state.alumnos),
   asistencia: deepCopy(state.asistencia),
@@ -359,6 +406,7 @@ function serializePersistedState(){
       email: state?.userProfile?.email || activeUser?.email || '',
       uid: state?.userProfile?.uid || activeUser?.uid || ''
     },
+    plan: state.plan,
     cursos: state.cursos,
     alumnos: state.alumnos,
     asistencia: state.asistencia,
@@ -373,7 +421,7 @@ function serializePersistedState(){
     asistObs: state.asistObs,
     colors: state.colors,
     fastMode: state.fastMode,
-    config: {fastMode: state.fastMode},
+    config: {fastMode: state.fastMode, plan: state.plan},
     _lastModified: state._lastModified,
   };
 }
@@ -385,7 +433,7 @@ function hasMeaningfulPersistedData(data){
 function applyPersistedState(data){
   if(!data || typeof data!=='object') return;
   const source = data.state && typeof data.state==='object' ? data.state : data;
-  ['cursos','alumnos','asistencia','acaps','listas','listasGlobales','notas','eventos','horarios','horasInstitucion','perfil','colors','config','userProfile'].forEach(k=>{
+  ['cursos','alumnos','asistencia','acaps','listas','listasGlobales','notas','eventos','horarios','horasInstitucion','perfil','colors','config','userProfile','plan'].forEach(k=>{
     if(typeof source[k] === 'undefined'){
       console.warn(`Firestore missing field: ${k}`);
     }
@@ -395,6 +443,9 @@ function applyPersistedState(data){
   });
   if(source.config && typeof source.config.fastMode !== 'undefined' && !isMeaningfulValue(source.fastMode, state.fastMode)){
     state.fastMode = source.config.fastMode;
+  }
+  if(source.config && typeof source.config.plan !== 'undefined' && !isMeaningfulValue(source.plan, state.plan)){
+    state.plan = source.config.plan;
   }
   if(source.userProfile && typeof source.userProfile === 'object'){
     state.userProfile = {
@@ -410,6 +461,7 @@ function applyPersistedState(data){
 function persistLocalState(){
   S.set('pp_perfil',state.perfil);
   S.set('pp_user_profile',state.userProfile);
+  S.set('pp_plan',state.plan);
   S.set('pp_cursos',state.cursos);
   S.set('pp_alumnos',state.alumnos);
   S.set('pp_asist',state.asistencia);
@@ -429,6 +481,7 @@ function persistLocalState(){
 function reloadScopedLocalState(){
   state.perfil = S.get('pp_perfil', deepCopy(PERSIST_DEFAULTS.perfil));
   state.userProfile = S.get('pp_user_profile', deepCopy(PERSIST_DEFAULTS.userProfile));
+  state.plan = S.get('pp_plan', PERSIST_DEFAULTS.plan);
   state.cursos = S.get('pp_cursos', deepCopy(PERSIST_DEFAULTS.cursos));
   state.alumnos = S.get('pp_alumnos', deepCopy(PERSIST_DEFAULTS.alumnos));
   state.asistencia = S.get('pp_asist', deepCopy(PERSIST_DEFAULTS.asistencia));
@@ -677,6 +730,20 @@ function fmtDateTime(iso){
   if(!iso) return '';
   return new Date(iso).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
+function isPremiumPlan(){ return state.plan === 'premium'; }
+function requirePremiumFeature(msg){
+  if(isPremiumPlan()) return true;
+  alert(msg || 'Esta función está disponible en Premium');
+  return false;
+}
+function canCreateMoreCourses(){
+  return isPremiumPlan() || (state.cursos||[]).length < 1;
+}
+function togglePlanForTest(plan){
+  state.plan = plan === 'premium' ? 'premium' : 'free';
+  save();
+  render();
+}
 function ensureDefaultPresentForDate(cursoId, fecha){
   const alumnos = state.alumnos[cursoId]||[];
   let changed = false;
@@ -865,6 +932,7 @@ function buildApp(){
 
 function buildAuthScreen(){
   const mode = state._authMode==='register' ? 'register' : 'login';
+  const remember = state._rememberLogin !== false;
   return `<div class="screen" style="max-width:500px;margin:0 auto;padding-top:42px">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:28px;font-weight:900;color:var(--primary);letter-spacing:-.5px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
@@ -882,8 +950,16 @@ function buildAuthScreen(){
         <button onclick="registrarUsuario()" class="btn-primary">Crear cuenta</button>
       ` : `
         <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_login_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
-        <div style="margin-bottom:16px"><label>CONTRASEÑA</label><input id="auth_login_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        <div style="margin-bottom:12px"><label>CONTRASEÑA</label><input id="auth_login_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer">
+          <input type="checkbox" id="auth_remember" ${remember?'checked':''} onchange="setRememberLogin(this.checked)" style="margin-top:3px"/>
+          <span style="font-size:13px;color:#555;line-height:1.4">
+            <span style="font-weight:700;color:#333;display:block">Mantener sesión iniciada</span>
+            <span style="font-size:12px;color:#777">Si no marcás esta opción, tendrás que iniciar sesión nuevamente al volver a abrir la app.</span>
+          </span>
+        </label>
         <button onclick="iniciarSesion()" class="btn-primary">Iniciar sesión</button>
+        <button onclick="recuperarContrasena()" style="margin-top:10px;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;width:100%">Olvidé mi contraseña</button>
       `}
     </div>
     <div class="card" style="font-size:12px;color:#666;line-height:1.5">
@@ -1343,7 +1419,7 @@ function buildListas(c){
   let html = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:16px">
     <span style="font-weight:700;font-size:15px;color:var(--primary)">Listas personalizadas</span>
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-      <button style="background:#eff3ff;border:none;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:13px" onclick="openModal('lista',{modo:'global'})">+ Global</button>
+      <button style="background:#eff3ff;border:none;border-radius:10px;padding:8px 12px;color:var(--accent);font-weight:700;font-size:13px" onclick="${isPremiumPlan() ? `openModal('lista',{modo:'global'})` : `openModal('premiumPlan')`}">+ Global</button>
       <button style="background:var(--accent);border:none;border-radius:10px;padding:8px 14px;color:#fff;font-weight:700;font-size:13px" onclick="openModal('lista',{modo:'curso'})">+ Nueva</button>
     </div>
   </div>`;
@@ -1675,7 +1751,10 @@ function buildPerfil(){
       <span style="font-weight:900;font-size:20px;color:var(--primary)">MI PERFIL</span>
     </div>
     <div style="text-align:center;margin-bottom:24px">
-      <div style="width:90px;height:90px;border-radius:50%;background:color-mix(in srgb,var(--accent) 20%,#fff);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);color:var(--accent)">${ICONS.user}</div>
+      <div style="width:90px;height:90px;border-radius:50%;background:color-mix(in srgb,var(--accent) 20%,#fff);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);color:var(--accent);overflow:hidden">
+        ${p.foto ? `<img src="${esc(p.foto)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover"/>` : ICONS.user}
+      </div>
+      <button onclick="seleccionarFotoPerfil()" class="btn-ghost" style="max-width:220px;margin:0 auto 12px">Cambiar foto</button>
     </div>
     ${[{k:'nombre',l:'Nombre del Preceptor'},{k:'escuela',l:'Escuela'},{k:'turno',l:'Turno'}].map(({k,l})=>`
       <div style="margin-bottom:14px">
@@ -1683,6 +1762,15 @@ function buildPerfil(){
         <input class="inp" id="perfil_${k}" value="${esc(p[k]||'')}" placeholder="${l}"/>
       </div>`).join('')}
     <button onclick="guardarPerfil()" class="btn-primary" style="margin-top:10px">Guardar</button>
+    <button onclick="openModal('changePassword')" class="btn-ghost" style="margin-top:10px">Cambiar contraseña</button>
+    <div class="card" style="margin-top:16px;text-align:left">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">SOPORTE</div>
+      <div style="font-size:13px;color:#666;line-height:1.5;margin-bottom:12px">¿Tenés un problema o sugerencia? Contactanos.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button onclick="abrirSoporteEmail()" class="btn-primary" style="flex:1;min-width:150px">Enviar email</button>
+        <button onclick="abrirSoporteWhatsApp()" class="btn-ghost" style="flex:1;min-width:150px">WhatsApp</button>
+      </div>
+    </div>
   </div>`;
 }
 
@@ -1691,6 +1779,7 @@ function buildPerfil(){
 // ============================================================
 function buildConfig(){
   const cols = state.colors;
+  const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -1707,6 +1796,20 @@ function buildConfig(){
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
       <button class="back-btn" onclick="goHome()">${ICONS.back}</button>
       <span style="font-weight:900;font-size:20px;color:var(--primary)">CONFIGURACIÓN</span>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">PLAN ACTUAL</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:16px;color:var(--primary);font-weight:800">${planLabel}</div>
+          <div style="font-size:12px;color:#777;margin-top:4px">${isPremiumPlan()?'Cursos ilimitados y funciones avanzadas activas.':'Plan gratuito con 1 curso y funciones básicas.'}</div>
+        </div>
+        <button onclick="openModal('premiumPlan')" class="btn-primary" style="width:auto;padding:10px 14px">${isPremiumPlan()?'Ver Premium':'Pasar a Premium'}</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button onclick="togglePlanForTest('premium')" class="btn-ghost" style="flex:1;min-width:160px;font-size:12px">Activar Premium prueba</button>
+        <button onclick="togglePlanForTest('free')" class="btn-ghost" style="flex:1;min-width:160px;font-size:12px">Volver a Free prueba</button>
+      </div>
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">COLORES DE LA APLICACIÓN</div>
@@ -1770,6 +1873,8 @@ function buildModal(){
   else if(m==='horario') content = buildModalHorario(d);
   else if(m==='horasInst') content = buildModalHorasInstitucion();
   else if(m==='horarioCopy') content = buildModalHorarioCopy(d);
+  else if(m==='changePassword') content = buildModalChangePassword();
+  else if(m==='premiumPlan') content = buildModalPremiumPlan();
 
   return `<div class="modal-overlay" onclick="closeModal()">
     <div class="modal-box" onclick="event.stopPropagation()">
@@ -1793,6 +1898,8 @@ function modalTitle(m,d){
   if(m==='horario') return `${getHorasInstitucion()[d.hora]||''} · ${d.dia||''}`;
   if(m==='horasInst') return 'Horas de la institución';
   if(m==='horarioCopy') return 'Copiar horario';
+  if(m==='changePassword') return 'Cambiar contraseña';
+  if(m==='premiumPlan') return 'Preceptor Pro Premium';
   return '';
 }
 
@@ -1917,6 +2024,26 @@ function buildModalHorarioCopy(d){
       ${cursos.map(c=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #eee;border-radius:10px;margin-bottom:8px;cursor:pointer"><input type="checkbox" class="hor-copy-target" value="${c.id}"/><span style="font-size:13px;color:var(--primary);font-weight:600">${esc(c.nombre)}</span></label>`).join('') || '<div style="font-size:12px;color:#aaa;text-align:center;padding:16px 10px">No hay otros cursos disponibles</div>'}
     </div>
     <button onclick="copiarHorarioSeleccionado()" class="btn-primary">Copiar horario</button>`;
+}
+
+function buildModalChangePassword(){
+  return `
+    <div style="margin-bottom:12px"><label>CONTRASEÑA ACTUAL</label><input class="inp" id="pwd_actual" type="password" placeholder="Tu contraseña actual"/></div>
+    <div style="margin-bottom:12px"><label>NUEVA CONTRASEÑA</label><input class="inp" id="pwd_nueva" type="password" placeholder="Mínimo 6 caracteres"/></div>
+    <div style="margin-bottom:16px"><label>REPETIR NUEVA CONTRASEÑA</label><input class="inp" id="pwd_repetir" type="password" placeholder="Repetí la nueva contraseña"/></div>
+    <button onclick="cambiarContrasena()" class="btn-primary">Actualizar contraseña</button>`;
+}
+
+function buildModalPremiumPlan(){
+  return `
+    <div style="font-size:13px;color:#555;line-height:1.5;margin-bottom:14px">Beneficios de Premium:</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      ${['Cursos ilimitados','Exportar PDF y Excel','Backup completo','Listas globales','Soporte prioritario'].map(item=>`<div style="background:#f8f9fa;border-radius:10px;padding:10px 12px;font-size:13px;color:#333;font-weight:600">• ${item}</div>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button onclick="solicitarPremiumContacto()" class="btn-primary" style="flex:1;min-width:160px">Solicitar Premium</button>
+      <button onclick="togglePlanForTest('premium');closeModal();" class="btn-ghost" style="flex:1;min-width:160px">Activar Premium prueba</button>
+    </div>`;
 }
 
 function buildModalAcapFechas(d){
@@ -2083,10 +2210,15 @@ function setNotasSearch(v){ state._notasSearch=v; render(); }
 function toggleNotasImportantes(){ state._notasOnlyImportant=!state._notasOnlyImportant; render(); }
 function setListaActiva(i){ state._listaActiva = (i===null||i===undefined) ? null : i; render(); }
 function setAuthMode(mode){ state._authMode = mode==='register' ? 'register' : 'login'; render(); }
+function setRememberLogin(checked){ state._rememberLogin = !!checked; }
 
 // Modals
 function openModal(type, extra){
   state._listaCols=['','',''];
+  if(type==='curso' && !canCreateMoreCourses()){
+    alert('Tu plan gratuito permite 1 curso. Pasá a Premium para crear más cursos.');
+    return;
+  }
   if(type==='cursoEdit'){
     const c=state.cursos.find(x=>x.id===extra);
     setState({modal:'cursoEdit', modalData:c||{}});
@@ -2134,8 +2266,13 @@ function registrarUsuario(){
 function iniciarSesion(){
   const email = (document.getElementById('auth_login_email')?.value||'').trim().toLowerCase();
   const password = document.getElementById('auth_login_pass')?.value || '';
+  const remember = document.getElementById('auth_remember')?.checked !== false;
   if(firebaseEnabled && firebaseAuth){
-    firebaseAuth.signInWithEmailAndPassword(email, password)
+    const persistence = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
+    setAuthPersistencePreference(remember);
+    state._rememberLogin = remember;
+    firebaseAuth.setPersistence(persistence)
+      .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
       .catch(err=>{
         alert(firebaseAuthError(err));
       });
@@ -2146,8 +2283,35 @@ function iniciarSesion(){
     alert('Email o contraseña incorrectos');
     return;
   }
-  setActiveUser({id:user.id, nombre:user.nombre, email:user.email});
+  setAuthPersistencePreference(remember);
+  state._rememberLogin = remember;
+  setActiveUser({id:user.id, nombre:user.nombre, email:user.email}, remember);
   window.location.reload();
+}
+
+function recuperarContrasena(){
+  if(!(firebaseEnabled && firebaseAuth)){
+    alert('La recuperación de contraseña requiere Firebase Authentication.');
+    return;
+  }
+  const inputEmail = (document.getElementById('auth_login_email')?.value||'').trim().toLowerCase();
+  const email = (inputEmail || prompt('Ingresá tu email para recuperar la contraseña:') || '').trim().toLowerCase();
+  if(!email){
+    alert('Ingresá un email válido.');
+    return;
+  }
+  firebaseAuth.sendPasswordResetEmail(email)
+    .then(()=>{
+      alert('Se envió un email para recuperar la contraseña');
+    })
+    .catch(err=>{
+      const code = err?.code || '';
+      if(code==='auth/user-not-found' || code==='auth/invalid-credential'){
+        alert('Email no registrado');
+        return;
+      }
+      alert(code==='auth/invalid-email' ? 'Ingresá un email válido.' : 'Error al enviar el correo');
+    });
 }
 
 function cerrarSesion(){
@@ -2170,6 +2334,129 @@ function firebaseAuthError(err){
   if(code==='auth/user-not-found' || code==='auth/wrong-password' || code==='auth/invalid-credential') return 'Email o contraseña incorrectos.';
   if(code==='auth/network-request-failed') return 'No se pudo conectar con Firebase. Revisá tu conexión.';
   return err?.message || 'No se pudo completar la autenticación.';
+}
+
+function abrirSoporteEmail(){
+  if(!SUPPORT_EMAIL || SUPPORT_EMAIL==='TU_EMAIL'){
+    alert('Configurá el email de soporte en la app.');
+    return;
+  }
+  window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Soporte Preceptor Pro')}`;
+}
+
+function abrirSoporteWhatsApp(){
+  if(!SUPPORT_WHATSAPP || SUPPORT_WHATSAPP==='TU_NUMERO'){
+    alert('Configurá el número de WhatsApp de soporte en la app.');
+    return;
+  }
+  window.open(`https://wa.me/${SUPPORT_WHATSAPP}`, '_blank');
+}
+
+function solicitarPremiumContacto(){
+  if(SUPPORT_WHATSAPP && SUPPORT_WHATSAPP!=='TU_NUMERO'){
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP}`, '_blank');
+    return;
+  }
+  if(SUPPORT_EMAIL && SUPPORT_EMAIL!=='TU_EMAIL'){
+    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Solicitud Premium Preceptor Pro')}`;
+    return;
+  }
+  alert('Configurá un contacto de soporte para solicitar Premium.');
+}
+
+function seleccionarFotoPerfil(){
+  const input = document.getElementById('profilePhotoInput');
+  if(!input) return;
+  input.value = '';
+  input.click();
+}
+
+function subirFotoPerfil(event){
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if(!file) return;
+  const done = ()=>{ if(input) input.value = ''; };
+  const isValidType = ['image/jpeg','image/png'].includes(file.type);
+  if(!isValidType){
+    alert('Seleccioná una imagen JPG o PNG');
+    done();
+    return;
+  }
+  if(file.size > 2 * 1024 * 1024){
+    alert('La imagen debe pesar como máximo 2 MB');
+    done();
+    return;
+  }
+  if(!(firebaseEnabled && storageEnabled && storageDb && activeUser?.uid)){
+    alert('Error al subir la imagen');
+    done();
+    return;
+  }
+
+  setCloudStatus('syncing');
+  const ref = storageDb.ref().child(`users/${activeUser.uid}/profile.jpg`);
+  ref.put(file, {contentType:file.type, cacheControl:'public,max-age=3600'})
+    .then(()=>ref.getDownloadURL())
+    .then(url=>{
+      if(!url) throw new Error('no-url');
+      state.perfil = {...(state.perfil||{}), foto:url};
+      save();
+      render();
+      flashToast('Foto actualizada correctamente');
+    })
+    .catch(err=>{
+      console.error('Profile photo upload error', err);
+      setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
+      alert('Error al subir la imagen');
+    })
+    .finally(done);
+}
+
+function cambiarContrasena(){
+  const actual = document.getElementById('pwd_actual')?.value || '';
+  const nueva = document.getElementById('pwd_nueva')?.value || '';
+  const repetir = document.getElementById('pwd_repetir')?.value || '';
+  if(!actual || !nueva || !repetir){
+    alert('Completá todos los campos');
+    return;
+  }
+  if(nueva.length < 6){
+    alert('La nueva contraseña debe tener al menos 6 caracteres');
+    return;
+  }
+  if(nueva !== repetir){
+    alert('Las contraseñas no coinciden');
+    return;
+  }
+  if(!(firebaseEnabled && firebaseAuth?.currentUser)){
+    alert('Error al actualizar contraseña');
+    return;
+  }
+  const user = firebaseAuth.currentUser;
+  const email = user.email || activeUser?.email || '';
+  if(!email){
+    alert('Error al actualizar contraseña');
+    return;
+  }
+  const credential = firebase.auth.EmailAuthProvider.credential(email, actual);
+  user.reauthenticateWithCredential(credential)
+    .then(()=>user.updatePassword(nueva))
+    .then(()=>{
+      alert('Contraseña actualizada correctamente');
+      closeModal();
+    })
+    .catch(err=>{
+      const code = err?.code || '';
+      if(code==='auth/wrong-password' || code==='auth/invalid-credential'){
+        alert('La contraseña actual no es correcta');
+        return;
+      }
+      if(code==='auth/weak-password'){
+        alert('La nueva contraseña debe tener al menos 6 caracteres');
+        return;
+      }
+      alert('Error al actualizar contraseña');
+    });
 }
 
 function openHorModal(cursoId, hora, dia){
@@ -2519,6 +2806,7 @@ function pegarAcapEnVariosAlumnos(){
   alert(copied ? 'Fechas pegadas correctamente' : 'No había fechas nuevas para pegar');
 }
 function exportarAcapAlumnoPDF(cursoId, alumnoId){
+  if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
   const curso = state.cursos.find(c=>c.id===cursoId);
   const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
   const entries = getAcapEntriesForAlumno(cursoId, alumnoId, {desde:state._acapDesde, hasta:state._acapHasta});
@@ -2538,6 +2826,7 @@ function exportarAcapAlumnoPDF(cursoId, alumnoId){
   win.print();
 }
 function exportarAcapCursoExcel(cursoId){
+  if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
   const curso = state.cursos.find(c=>c.id===cursoId);
   const rows = getAcapRowsForCurso(cursoId, {desde:state._acapDesde, hasta:state._acapHasta, search:state._acapSearch});
   const htmlRows = rows.map(({alumno,fecha,data})=>{
@@ -2556,6 +2845,7 @@ function exportarAcapCursoExcel(cursoId){
   URL.revokeObjectURL(url);
 }
 function crearBackupManualAcap(){
+  if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
   guardarBackupLocalAcap(true);
 }
 
@@ -2612,6 +2902,7 @@ function guardarLista(modo){
   const cols = [...document.querySelectorAll('.lista-col')].map(i=>i.value.trim()).filter(Boolean);
   if(!cols.length) return;
   if(modo==='global'){
+    if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
     const miembros = [...new Set(
       [...document.querySelectorAll('.lista-global-alumno:checked')]
         .map(el=>el.value)
@@ -2742,7 +3033,15 @@ function guardarCurso(){
   const c={nombre,orientacion:document.getElementById('c_orientacion')?.value||'',color:document.getElementById('c_color')?.value||COLORES[0]};
   const id=document.getElementById('c_id')?.value;
   if(id){ state.cursos=state.cursos.map(x=>x.id===id?{...c,id}:x); }
-  else { const nc={...c,id:uid()}; state.cursos=[...state.cursos,nc]; state.alumnos[nc.id]=[]; }
+  else {
+    if(!canCreateMoreCourses()){
+      alert('Tu plan gratuito permite 1 curso. Pasá a Premium para crear más cursos.');
+      return;
+    }
+    const nc={...c,id:uid()};
+    state.cursos=[...state.cursos,nc];
+    state.alumnos[nc.id]=[];
+  }
   save(); closeModal();
 }
 function borrarCurso(id){
@@ -2862,6 +3161,7 @@ function toggleFastMode(){ state.fastMode=!state.fastMode; save(); render(); }
 
 // Backup
 function exportarDatos(){
+  if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
   const json = JSON.stringify(state, null, 2);
   const blob = new Blob([json], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -2874,6 +3174,7 @@ function exportarDatos(){
   URL.revokeObjectURL(url);
 }
 function seleccionarBackup(){
+  if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
   const input = document.getElementById('backupImportInput');
   if(!input) return;
   input.value = '';
@@ -2914,6 +3215,7 @@ function importarBackup(event){
 	      if(!state.listasGlobales) state.listasGlobales = [];
 	      if(typeof state._authMode === 'undefined') state._authMode = 'login';
 	      if(!state.userProfile) state.userProfile = {nombre:activeUser?.nombre||'', email:activeUser?.email||'', uid:activeUser?.uid||''};
+	      if(!state.plan) state.plan = 'free';
 	      state.notas = (state.notas||[]).map(n=>({importante:false,fija:false,...n}));
 	      if(typeof state.modal === 'undefined') state.modal = null;
 	      if(typeof state.modalData === 'undefined') state.modalData = {};
