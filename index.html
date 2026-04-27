@@ -31,8 +31,8 @@
   .inp{width:100%;padding:11px 13px;border-radius:10px;border:1px solid #e0e0e0;font-size:14px;}
   .inp:focus{outline:2px solid var(--accent);border-color:transparent;}
   /* Modal */
-  .modal-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);}
-  .modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:20px 16px 32px;}
+  .modal-overlay{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);overflow-y:auto;padding-top:16px;}
+  .modal-box{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;padding:20px 16px 32px;}
   /* Tabs */
   .tabs{display:flex;background:#ebebf0;border-radius:12px;padding:4px;gap:2px;margin-bottom:14px;}
   .tab-btn{flex:1;padding:8px 4px;border-radius:9px;border:none;font-weight:700;font-size:11px;background:transparent;color:#888;transition:all .2s;}
@@ -81,6 +81,9 @@
   <!-- Rendered by JS -->
 </div>
 <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
 
 <script>
 // ============================================================
@@ -116,15 +119,148 @@ const DIAS_ACAP = [
 const HORAS = ["12:30 - 13:10","13:10 - 13:50","13:50 - 14:30","14:40 - 15:20","15:20 - 16:00","16:00 - 16:40","16:50 - 17:30","17:30 - 18:10","CONTRATURNO"];
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
+const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
+const AUTH_USERS_KEY = 'pp_auth_users';
+const AUTH_ACTIVE_KEY = 'pp_auth_active';
+const APP_DATA_KEYS = ['pp_perfil','pp_cursos','pp_alumnos','pp_asist','pp_acaps','pp_hor','pp_horas_inst','pp_eventos','pp_notas','pp_listas','pp_listas_globales','pp_acap_hist','pp_asist_obs','pp_colors','pp_fast_mode','pp_last_modified','pp_user_profile'];
+const firebaseConfig = {
+  apiKey: "AIzaSyB3L7CiwRYrOD6isSPm3XCy0k76GfoYPsA",
+  authDomain: "preceptor-pro-97caa.firebaseapp.com",
+  projectId: "preceptor-pro-97caa",
+  storageBucket: "preceptor-pro-97caa.firebasestorage.app",
+  messagingSenderId: "1096852070463",
+  appId: "1:1096852070463:web:945246c1a1ad1232f8988a"
+};
+
+function getStoredUsers(){ try{return JSON.parse(localStorage.getItem(AUTH_USERS_KEY)||'[]');}catch{return [];} }
+function getActiveUser(){ try{return JSON.parse(localStorage.getItem(AUTH_ACTIVE_KEY)||'null');}catch{return null;} }
+function setActiveUser(user){ try{localStorage.setItem(AUTH_ACTIVE_KEY, JSON.stringify(user));}catch{} }
+function clearActiveUser(){ try{localStorage.removeItem(AUTH_ACTIVE_KEY);}catch{} }
+let activeUser = getActiveUser();
+let firebaseApp = null;
+let firebaseAuth = null;
+let firestoreDb = null;
+let authReady = true;
+let firebaseEnabled = false;
+let firestoreEnabled = false;
+let remoteSaveTimer = null;
+let cloudStatusTimer = null;
+let remoteHydrating = false;
+function scopedStorageKey(k){
+  if(!activeUser || !APP_DATA_KEYS.includes(k)) return k;
+  return `pp_user_${activeUser.email}_${k}`;
+}
+function hasScopedData(email){
+  return APP_DATA_KEYS.some(k=>localStorage.getItem(`pp_user_${email}_${k}`)!==null);
+}
+function migrateLegacyDataToUser(email){
+  if(hasScopedData(email)) return;
+  APP_DATA_KEYS.forEach(k=>{
+    const legacy = localStorage.getItem(k);
+    if(legacy!==null){
+      localStorage.setItem(`pp_user_${email}_${k}`, legacy);
+    }
+  });
+}
+function initFirebaseAuth(){
+  try{
+    if(typeof firebase === 'undefined') return false;
+    firebaseApp = firebase.apps?.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+    firebaseAuth = firebase.auth();
+    firestoreDb = typeof firebase.firestore === 'function' ? firebase.firestore() : null;
+    firebaseEnabled = true;
+    firestoreEnabled = !!firestoreDb;
+    return true;
+  }catch(err){
+    console.error('Firebase init error', err);
+    firebaseEnabled = false;
+    firestoreEnabled = false;
+    return false;
+  }
+}
+function syncActiveUserFromFirebase(user){
+  if(user){
+    activeUser = {
+      uid: user.uid,
+      email: user.email || '',
+      nombre: user.displayName || user.email || 'Usuario'
+    };
+    migrateLegacyDataToUser(activeUser.email);
+    setActiveUser(activeUser);
+    state.userProfile = {
+      ...(state.userProfile||{}),
+      uid: activeUser.uid,
+      email: activeUser.email,
+      nombre: (String(state?.userProfile?.nombre||'').trim() && !isPlaceholderProfileName(state?.userProfile?.nombre)) ? String(state.userProfile.nombre).trim() : activeUser.nombre
+    };
+    if((!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) && String(activeUser.nombre||'').trim()){
+      state.perfil = {...(state.perfil||{}), nombre: activeUser.nombre};
+    }
+  } else {
+    activeUser = null;
+    clearActiveUser();
+  }
+}
+function getFutureCloudPayload(){
+  return {
+    user: activeUser ? {uid:activeUser.uid,email:activeUser.email} : null,
+    updatedAt: state?._lastModified || '',
+    dataKeys: APP_DATA_KEYS
+  };
+}
+function deepCopy(v){return JSON.parse(JSON.stringify(v));}
+function isPlaceholderProfileName(name){
+  return PERFIL_NAME_PLACEHOLDERS.includes(String(name||'').trim().toLowerCase());
+}
+function getVisibleUserName(){
+  const perfilNombre = String(state?.perfil?.nombre||'').trim();
+  if(perfilNombre && !isPlaceholderProfileName(perfilNombre)) return perfilNombre;
+  const userProfileNombre = String(state?.userProfile?.nombre||'').trim();
+  if(userProfileNombre && !isPlaceholderProfileName(userProfileNombre)) return userProfileNombre;
+  const firebaseNombre = String(firebaseAuth?.currentUser?.displayName||'').trim();
+  if(firebaseNombre && !isPlaceholderProfileName(firebaseNombre)) return firebaseNombre;
+  const emailNombre = String(activeUser?.email || firebaseAuth?.currentUser?.email || '').trim();
+  if(emailNombre) return emailNombre;
+  return 'Preceptor';
+}
+function isMeaningfulValue(next, current){
+  if(typeof next === 'undefined' || next === null) return false;
+  if(typeof next === 'string') return next.trim()!=='' || !String(current||'').trim();
+  if(Array.isArray(next)) return next.length>0 || !(Array.isArray(current) && current.length>0);
+  if(typeof next === 'object'){
+    const keys = Object.keys(next);
+    if(keys.length===0) return !(current && typeof current==='object' && Object.keys(current).length>0);
+    return true;
+  }
+  return true;
+}
+function setCloudStatus(status){
+  if(cloudStatusTimer){
+    clearTimeout(cloudStatusTimer);
+    cloudStatusTimer = null;
+  }
+  if(status === 'syncing'){
+    cloudStatusTimer = setTimeout(()=>{
+      if(state._cloudStatus === 'syncing'){
+        state._cloudStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
+        if(typeof document!=='undefined' && document.getElementById('app')) render();
+      }
+    }, 8000);
+  }
+  if(state._cloudStatus===status) return;
+  state._cloudStatus = status;
+  if(typeof document!=='undefined' && document.getElementById('app')) render();
+}
 
 const S = {
-  get:(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
-  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+  get:(k,d)=>{try{const v=localStorage.getItem(scopedStorageKey(k));return v?JSON.parse(v):d;}catch{return d;}},
+  set:(k,v)=>{try{localStorage.setItem(scopedStorageKey(k),JSON.stringify(v));}catch{}}
 };
 
 // ---- State ----
 let state = {
   perfil: S.get('pp_perfil', {nombre:'Preceptor/a', escuela:'Mi Escuela', turno:'Mañana'}),
+  userProfile: S.get('pp_user_profile', {nombre: activeUser?.nombre||'', email: activeUser?.email||'', uid: activeUser?.uid||''}),
   cursos: S.get('pp_cursos', [
     {id:'c1',nombre:'5° A BOEA',orientacion:'Economía y Administración',color:'#6C63FF'},
     {id:'c2',nombre:'5° B BOEA',orientacion:'Economía y Administración',color:'#C0392B'},
@@ -184,6 +320,8 @@ let state = {
   _asistOnlyAcap: false,
   _notasSearch: '',
   _notasOnlyImportant: false,
+  _authMode: 'login',
+  _cloudStatus: 'local',
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
   _lastModified: S.get('pp_last_modified', ''),
@@ -192,9 +330,86 @@ let state = {
   modalData: {},
 };
 
-function save(){
-  state._lastModified = new Date().toISOString();
+const PERSIST_DEFAULTS = {
+  perfil: deepCopy(state.perfil),
+  userProfile: deepCopy(state.userProfile),
+  cursos: deepCopy(state.cursos),
+  alumnos: deepCopy(state.alumnos),
+  asistencia: deepCopy(state.asistencia),
+  acaps: deepCopy(state.acaps),
+  horarios: deepCopy(state.horarios),
+  horasInstitucion: deepCopy(state.horasInstitucion),
+  eventos: deepCopy(state.eventos),
+  notas: deepCopy(state.notas),
+  listas: deepCopy(state.listas),
+  listasGlobales: deepCopy(state.listasGlobales),
+  acapHistorial: deepCopy(state.acapHistorial),
+  asistObs: deepCopy(state.asistObs),
+  colors: deepCopy(state.colors),
+  fastMode: state.fastMode,
+  config: {fastMode: state.fastMode},
+  _lastModified: state._lastModified,
+};
+function serializePersistedState(){
+  return {
+    perfil: state.perfil,
+    userProfile: {
+      ...(state.userProfile||{}),
+      nombre: String(state?.userProfile?.nombre||'').trim() || getVisibleUserName(),
+      email: state?.userProfile?.email || activeUser?.email || '',
+      uid: state?.userProfile?.uid || activeUser?.uid || ''
+    },
+    cursos: state.cursos,
+    alumnos: state.alumnos,
+    asistencia: state.asistencia,
+    acaps: state.acaps,
+    horarios: state.horarios,
+    horasInstitucion: state.horasInstitucion,
+    eventos: state.eventos,
+    notas: state.notas,
+    listas: state.listas,
+    listasGlobales: state.listasGlobales,
+    acapHistorial: state.acapHistorial,
+    asistObs: state.asistObs,
+    colors: state.colors,
+    fastMode: state.fastMode,
+    config: {fastMode: state.fastMode},
+    _lastModified: state._lastModified,
+  };
+}
+function hasMeaningfulPersistedData(data){
+  if(!data || typeof data!=='object') return false;
+  const source = data.state && typeof data.state==='object' ? data.state : data;
+  return Object.keys(PERSIST_DEFAULTS).some(k=>typeof source[k] !== 'undefined');
+}
+function applyPersistedState(data){
+  if(!data || typeof data!=='object') return;
+  const source = data.state && typeof data.state==='object' ? data.state : data;
+  ['cursos','alumnos','asistencia','acaps','listas','listasGlobales','notas','eventos','horarios','horasInstitucion','perfil','colors','config','userProfile'].forEach(k=>{
+    if(typeof source[k] === 'undefined'){
+      console.warn(`Firestore missing field: ${k}`);
+    }
+  });
+  Object.keys(PERSIST_DEFAULTS).forEach(k=>{
+    if(isMeaningfulValue(source[k], state[k])) state[k] = source[k];
+  });
+  if(source.config && typeof source.config.fastMode !== 'undefined' && !isMeaningfulValue(source.fastMode, state.fastMode)){
+    state.fastMode = source.config.fastMode;
+  }
+  if(source.userProfile && typeof source.userProfile === 'object'){
+    state.userProfile = {
+      ...(state.userProfile||{}),
+      ...source.userProfile,
+      nombre: String(source.userProfile.nombre||'').trim() || String(state?.userProfile?.nombre||'').trim() || String(activeUser?.nombre||'').trim() || ''
+    };
+  }
+  if((!state.perfil || !String(state.perfil.nombre||'').trim() || isPlaceholderProfileName(state.perfil.nombre)) && source.userProfile?.nombre){
+    state.perfil = {...(state.perfil||{}), nombre: source.userProfile.nombre};
+  }
+}
+function persistLocalState(){
   S.set('pp_perfil',state.perfil);
+  S.set('pp_user_profile',state.userProfile);
   S.set('pp_cursos',state.cursos);
   S.set('pp_alumnos',state.alumnos);
   S.set('pp_asist',state.asistencia);
@@ -210,6 +425,135 @@ function save(){
   S.set('pp_colors',state.colors);
   S.set('pp_fast_mode',state.fastMode);
   S.set('pp_last_modified',state._lastModified);
+}
+function reloadScopedLocalState(){
+  state.perfil = S.get('pp_perfil', deepCopy(PERSIST_DEFAULTS.perfil));
+  state.userProfile = S.get('pp_user_profile', deepCopy(PERSIST_DEFAULTS.userProfile));
+  state.cursos = S.get('pp_cursos', deepCopy(PERSIST_DEFAULTS.cursos));
+  state.alumnos = S.get('pp_alumnos', deepCopy(PERSIST_DEFAULTS.alumnos));
+  state.asistencia = S.get('pp_asist', deepCopy(PERSIST_DEFAULTS.asistencia));
+  state.acaps = S.get('pp_acaps', deepCopy(PERSIST_DEFAULTS.acaps));
+  state.horarios = S.get('pp_hor', deepCopy(PERSIST_DEFAULTS.horarios));
+  state.horasInstitucion = S.get('pp_horas_inst', deepCopy(PERSIST_DEFAULTS.horasInstitucion));
+  state.eventos = S.get('pp_eventos', deepCopy(PERSIST_DEFAULTS.eventos));
+  state.notas = S.get('pp_notas', deepCopy(PERSIST_DEFAULTS.notas));
+  state.listas = S.get('pp_listas', deepCopy(PERSIST_DEFAULTS.listas));
+  state.listasGlobales = S.get('pp_listas_globales', deepCopy(PERSIST_DEFAULTS.listasGlobales));
+  state.acapHistorial = S.get('pp_acap_hist', deepCopy(PERSIST_DEFAULTS.acapHistorial));
+  state.asistObs = S.get('pp_asist_obs', deepCopy(PERSIST_DEFAULTS.asistObs));
+  state.colors = S.get('pp_colors', deepCopy(PERSIST_DEFAULTS.colors));
+  state.fastMode = S.get('pp_fast_mode', PERSIST_DEFAULTS.fastMode);
+  state._lastModified = S.get('pp_last_modified', PERSIST_DEFAULTS._lastModified);
+  state.userProfile = {
+    ...(state.userProfile||{}),
+    uid: state.userProfile?.uid || activeUser?.uid || '',
+    email: state.userProfile?.email || activeUser?.email || '',
+    nombre: (String(state.userProfile?.nombre||'').trim() && !isPlaceholderProfileName(state.userProfile?.nombre)) ? String(state.userProfile.nombre).trim() : (String(activeUser?.nombre||'').trim() || String(firebaseAuth?.currentUser?.displayName||'').trim() || '')
+  };
+  if(!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)){
+    const visibleName = String(state.userProfile?.nombre||'').trim() || String(firebaseAuth?.currentUser?.displayName||'').trim() || String(activeUser?.email||'').trim();
+    if(visibleName){
+      state.perfil = {...(state.perfil||{}), nombre: visibleName};
+    }
+  }
+}
+function getFirestoreDocRef(mode){
+  if(!firestoreEnabled || !activeUser?.uid) return null;
+  if(mode==='legacy') return firestoreDb.collection('users').doc(activeUser.uid).collection('data').doc('appState');
+  return firestoreDb.collection('users').doc(activeUser.uid).collection('appData').doc('main');
+}
+async function loadDataFromFirestore(){
+  try{
+    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
+    let data = null;
+    for(const ref of refs){
+      const snap = await ref.get();
+      if(snap.exists && hasMeaningfulPersistedData(snap.data())){
+        data = snap.data();
+        break;
+      }
+    }
+    if(!data) return false;
+    remoteHydrating = true;
+    applyPersistedState(data);
+    remoteHydrating = false;
+    persistLocalState();
+    return true;
+  }catch(err){
+    console.error('Firestore load error', err);
+    return false;
+  }finally{
+    remoteHydrating = false;
+  }
+}
+function queueFirestoreSave(){
+  if(remoteHydrating) return;
+  if(!activeUser?.uid || !firestoreEnabled){
+    setCloudStatus('local');
+    return;
+  }
+  if(typeof navigator!=='undefined' && !navigator.onLine){
+    setCloudStatus('offline');
+    return;
+  }
+  clearTimeout(remoteSaveTimer);
+  setCloudStatus('syncing');
+  remoteSaveTimer = setTimeout(()=>{ saveToFirestore(); }, 500);
+}
+async function saveToFirestore(){
+  let nextStatus = 'synced';
+  try{
+    const ref = getFirestoreDocRef('main');
+    if(!ref){
+      nextStatus = 'local';
+      return;
+    }
+    await ref.set({
+      state: serializePersistedState(),
+      meta: {
+        updatedAt: state._lastModified || new Date().toISOString(),
+        dataKeys: APP_DATA_KEYS
+      }
+    }, {merge:true});
+  }catch(err){
+    console.error('Firestore save error', err);
+    nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
+  }finally{
+    setCloudStatus(nextStatus);
+  }
+}
+function hydrateFromFirestoreInBackground(){
+  if(!activeUser?.uid){
+    setCloudStatus('local');
+    return;
+  }
+  if(!firestoreEnabled){
+    setCloudStatus('local');
+    return;
+  }
+  if(typeof navigator!=='undefined' && !navigator.onLine){
+    setCloudStatus('offline');
+    return;
+  }
+  setCloudStatus('syncing');
+  loadDataFromFirestore()
+    .then(loaded=>{
+      if(loaded){
+        setCloudStatus('synced');
+        render();
+      } else {
+        queueFirestoreSave();
+      }
+    })
+    .catch(err=>{
+      console.error('Background Firestore hydrate error', err);
+      setCloudStatus('offline');
+    });
+}
+
+function save(){
+  state._lastModified = new Date().toISOString();
+  persistLocalState();
   try{
     const today = todayISO();
     const lastBackup = localStorage.getItem('pp_auto_backup_day');
@@ -218,6 +562,7 @@ function save(){
       localStorage.setItem('pp_auto_backup_day', today);
     }
   }catch{}
+  queueFirestoreSave();
   flashToast('Guardado correctamente');
 }
 
@@ -481,6 +826,12 @@ function render(){
 }
 
 function buildApp(){
+  if(!authReady){
+    return `<div class="screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh"><div class="card" style="text-align:center"><div style="font-weight:800;font-size:18px;color:var(--primary);margin-bottom:8px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div><div style="font-size:13px;color:#777">Cargando sesión...</div></div></div>`;
+  }
+  if(!activeUser){
+    return `<div>${buildAuthScreen()}${state._toast ? `<div style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:3000;background:#1f7a3f;color:#fff;padding:10px 14px;border-radius:12px;font-size:12px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.18)">${esc(state._toast)}</div>` : ''}</div>`;
+  }
   let html = '';
   if(state.screen==='perfil') html = buildPerfil();
   else if(state.screen==='config') html = buildConfig();
@@ -493,15 +844,52 @@ function buildApp(){
   const showNav = state.screen!=='perfil' && state.screen!=='config' && state.screen!=='curso';
   const showFab = showNav && state.tab==='cursos';
 
+  const cloudStatusMap = {
+    syncing: {text:'Sincronizando...', bg:'#fff8e1', color:'#b26a00'},
+    synced: {text:'Guardado en la nube', bg:'#effaf3', color:'#1f7a3f'},
+    offline: {text:'Guardado local / sin conexión', bg:'#fff5f5', color:'#c0392b'},
+    local: {text:'Guardado local / sin conexión', bg:'#f3f4f6', color:'#666'},
+  };
+  const cloudUi = cloudStatusMap[state._cloudStatus||'local'];
   return `
     <div>
       ${html}
       ${showNav ? buildBottomNav() : ''}
       ${showFab ? `<button class="fab" onclick="openModal('curso')">+</button>` : ''}
       ${state.modal ? buildModal() : ''}
+      ${activeUser ? `<div style="position:fixed;right:12px;bottom:${showNav?76:18}px;z-index:2500;background:${cloudUi.bg};color:${cloudUi.color};padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(cloudUi.text)}</div>` : ''}
       ${state._toast ? `<div style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:3000;background:#1f7a3f;color:#fff;padding:10px 14px;border-radius:12px;font-size:12px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.18)">${esc(state._toast)}</div>` : ''}
     </div>
   `;
+}
+
+function buildAuthScreen(){
+  const mode = state._authMode==='register' ? 'register' : 'login';
+  return `<div class="screen" style="max-width:500px;margin:0 auto;padding-top:42px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:28px;font-weight:900;color:var(--primary);letter-spacing:-.5px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
+      <div style="font-size:13px;color:#777;margin-top:6px">Ingreso local por usuario</div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="tabs">
+        <button class="tab-btn ${mode==='login'?'active':''}" onclick="setAuthMode('login')">INGRESAR</button>
+        <button class="tab-btn ${mode==='register'?'active':''}" onclick="setAuthMode('register')">CREAR CUENTA</button>
+      </div>
+      ${mode==='register' ? `
+        <div style="margin-bottom:12px"><label>NOMBRE</label><input id="auth_nombre" class="inp" placeholder="Tu nombre"/></div>
+        <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
+        <div style="margin-bottom:16px"><label>CONTRASEÑA</label><input id="auth_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        <button onclick="registrarUsuario()" class="btn-primary">Crear cuenta</button>
+      ` : `
+        <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_login_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
+        <div style="margin-bottom:16px"><label>CONTRASEÑA</label><input id="auth_login_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        <button onclick="iniciarSesion()" class="btn-primary">Iniciar sesión</button>
+      `}
+    </div>
+    <div class="card" style="font-size:12px;color:#666;line-height:1.5">
+      Cada usuario conserva sus propios cursos, alumnos, asistencia, ACAP, notas y listas en este dispositivo.
+    </div>
+  </div>`;
 }
 
 // ============================================================
@@ -620,8 +1008,9 @@ function buildHome(){
       <div>
         <div style="font-size:12px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">${fmtFecha(hoy)}</div>
         <div style="font-size:26px;font-weight:900;color:var(--primary);letter-spacing:-.5px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
-        <div style="font-size:15px;color:#555;margin-top:4px">${saludo()}, <strong>${esc(state.perfil.nombre)}</strong>! ${emoji}</div>
+        <div style="font-size:15px;color:#555;margin-top:4px">${saludo()}, <strong>${esc(getVisibleUserName())}</strong>! ${emoji}</div>
         <div style="font-size:12px;color:#888;margin-top:4px">${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})} · ${state._online?'En línea':'Sin conexión'}</div>
+        <div style="font-size:12px;color:#888;margin-top:4px">Sesión: ${esc(activeUser?.nombre||activeUser?.email||'')}</div>
       </div>
       <div style="display:flex;gap:8px;padding-top:4px">
         <button style="background:none;border:none;padding:4px" onclick="goScreen('config')">${ICONS.settings}</button>
@@ -1349,6 +1738,12 @@ function buildConfig(){
         <button onclick="seleccionarBackup()" class="btn-ghost" style="flex:1">Importar datos</button>
       </div>
     </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">SESIÓN</div>
+      <div style="font-size:14px;color:#333;font-weight:600;margin-bottom:4px">${esc(activeUser?.nombre||'')}</div>
+      <div style="font-size:12px;color:#777;margin-bottom:12px">${esc(activeUser?.email||'')}</div>
+      <button onclick="cerrarSesion()" class="btn-ghost" style="color:#c0392b">Cerrar sesión</button>
+    </div>
     <div class="card">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">MIS CURSOS</div>
       ${cursosHtml}
@@ -1687,6 +2082,7 @@ function setNotasOrden(v){ state._notasOrden=v; render(); }
 function setNotasSearch(v){ state._notasSearch=v; render(); }
 function toggleNotasImportantes(){ state._notasOnlyImportant=!state._notasOnlyImportant; render(); }
 function setListaActiva(i){ state._listaActiva = (i===null||i===undefined) ? null : i; render(); }
+function setAuthMode(mode){ state._authMode = mode==='register' ? 'register' : 'login'; render(); }
 
 // Modals
 function openModal(type, extra){
@@ -1701,6 +2097,80 @@ function openModal(type, extra){
   }
 }
 function closeModal(){ setState({modal:null, modalData:{}}); }
+
+function registrarUsuario(){
+  const nombre = document.getElementById('auth_nombre')?.value?.trim();
+  const email = (document.getElementById('auth_email')?.value||'').trim().toLowerCase();
+  const password = document.getElementById('auth_pass')?.value || '';
+  if(!nombre || !email || !password){
+    alert('Completá nombre, email y contraseña');
+    return;
+  }
+  if(firebaseEnabled && firebaseAuth){
+    firebaseAuth.createUserWithEmailAndPassword(email, password)
+      .then(({user})=>user?.updateProfile ? user.updateProfile({displayName:nombre}) : null)
+      .then(()=>{
+        migrateLegacyDataToUser(email);
+        state.userProfile = {nombre, email, uid: firebaseAuth?.currentUser?.uid || ''};
+        state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
+      })
+      .catch(err=>{
+        alert(firebaseAuthError(err));
+      });
+    return;
+  }
+  const users = getStoredUsers();
+  if(users.some(u=>u.email===email)){
+    alert('Ya existe un usuario con ese email');
+    return;
+  }
+  const nuevo = {id:uid(), nombre, email, password};
+  try{ localStorage.setItem(AUTH_USERS_KEY, JSON.stringify([...users, nuevo])); }catch{}
+  if(!users.length) migrateLegacyDataToUser(email);
+  setActiveUser({id:nuevo.id, nombre:nuevo.nombre, email:nuevo.email});
+  window.location.reload();
+}
+
+function iniciarSesion(){
+  const email = (document.getElementById('auth_login_email')?.value||'').trim().toLowerCase();
+  const password = document.getElementById('auth_login_pass')?.value || '';
+  if(firebaseEnabled && firebaseAuth){
+    firebaseAuth.signInWithEmailAndPassword(email, password)
+      .catch(err=>{
+        alert(firebaseAuthError(err));
+      });
+    return;
+  }
+  const user = getStoredUsers().find(u=>u.email===email && u.password===password);
+  if(!user){
+    alert('Email o contraseña incorrectos');
+    return;
+  }
+  setActiveUser({id:user.id, nombre:user.nombre, email:user.email});
+  window.location.reload();
+}
+
+function cerrarSesion(){
+  if(!confirm('¿Cerrar sesión?')) return;
+  if(firebaseEnabled && firebaseAuth){
+    firebaseAuth.signOut().catch(()=>{}).finally(()=>{
+      clearActiveUser();
+      window.location.reload();
+    });
+    return;
+  }
+  clearActiveUser();
+  window.location.reload();
+}
+function firebaseAuthError(err){
+  const code = err?.code || '';
+  if(code==='auth/email-already-in-use') return 'Ese email ya está registrado.';
+  if(code==='auth/invalid-email') return 'El email no es válido.';
+  if(code==='auth/weak-password') return 'La contraseña es demasiado débil.';
+  if(code==='auth/user-not-found' || code==='auth/wrong-password' || code==='auth/invalid-credential') return 'Email o contraseña incorrectos.';
+  if(code==='auth/network-request-failed') return 'No se pudo conectar con Firebase. Revisá tu conexión.';
+  return err?.message || 'No se pudo completar la autenticación.';
+}
 
 function openHorModal(cursoId, hora, dia){
   setState({modal:'horario', modalData:{cursoId, hora, dia}});
@@ -2350,11 +2820,32 @@ function copiarHorarioSeleccionado(){
 
 // Perfil
 function guardarPerfil(){
+  const nombreInput = String(document.getElementById('perfil_nombre')?.value||'').trim();
+  const institucionInput = String(document.getElementById('perfil_institucion')?.value || document.getElementById('perfil_escuela')?.value || '').trim();
+  const turnoInput = String(document.getElementById('perfil_turno')?.value||'').trim();
+  const nombrePrevio = String(state?.perfil?.nombre||'').trim();
+  const nombreFinal = nombreInput || (!isPlaceholderProfileName(nombrePrevio) ? nombrePrevio : '') || String(state?.userProfile?.nombre||'').trim() || String(activeUser?.nombre||'').trim() || '';
   state.perfil={
-    nombre:document.getElementById('perfil_nombre')?.value||'',
-    escuela:document.getElementById('perfil_escuela')?.value||'',
-    turno:document.getElementById('perfil_turno')?.value||'',
+    ...(state.perfil||{}),
+    nombre:nombreFinal,
+    escuela:institucionInput || state?.perfil?.escuela || state?.perfil?.institucion || '',
+    institucion:institucionInput || state?.perfil?.institucion || state?.perfil?.escuela || '',
+    turno:turnoInput || state?.perfil?.turno || '',
+    foto: state?.perfil?.foto || '',
   };
+  state.userProfile = {
+    ...(state.userProfile||{}),
+    nombre: state.perfil.nombre || state.userProfile?.nombre || activeUser?.nombre || '',
+    email: state.userProfile?.email || activeUser?.email || '',
+    uid: state.userProfile?.uid || activeUser?.uid || ''
+  };
+  if(activeUser){
+    activeUser = {...activeUser, nombre: state.userProfile.nombre || activeUser.nombre};
+    setActiveUser(activeUser);
+  }
+  if(firebaseAuth?.currentUser && state.perfil.nombre){
+    firebaseAuth.currentUser.updateProfile({displayName: state.perfil.nombre}).catch(()=>{});
+  }
   save(); goHome();
 }
 
@@ -2421,6 +2912,8 @@ function importarBackup(event){
 	      if(typeof state._notasSearch === 'undefined') state._notasSearch = '';
 	      if(typeof state._notasOnlyImportant === 'undefined') state._notasOnlyImportant = false;
 	      if(!state.listasGlobales) state.listasGlobales = [];
+	      if(typeof state._authMode === 'undefined') state._authMode = 'login';
+	      if(!state.userProfile) state.userProfile = {nombre:activeUser?.nombre||'', email:activeUser?.email||'', uid:activeUser?.uid||''};
 	      state.notas = (state.notas||[]).map(n=>({importante:false,fija:false,...n}));
 	      if(typeof state.modal === 'undefined') state.modal = null;
 	      if(typeof state.modalData === 'undefined') state.modalData = {};
@@ -2440,12 +2933,42 @@ function importarBackup(event){
 // ============================================================
 applyColors();
 ensureAutoAcapForDate(todayISO());
-window.addEventListener('online', ()=>{state._online=true; render();});
-window.addEventListener('offline', ()=>{state._online=false; render();});
+window.addEventListener('online', ()=>{
+  state._online=true;
+  if(activeUser?.uid && firestoreEnabled){
+    hydrateFromFirestoreInBackground();
+  } else {
+    setCloudStatus('local');
+    render();
+  }
+});
+window.addEventListener('offline', ()=>{
+  state._online=false;
+  setCloudStatus('offline');
+  render();
+});
 setInterval(()=>{
   if(state.screen==='home' && !state.modal) render();
 }, 60000);
-render();
+if(initFirebaseAuth() && firebaseAuth){
+  firebaseAuth.onAuthStateChanged(user=>{
+    syncActiveUserFromFirebase(user);
+    if(user){
+      reloadScopedLocalState();
+      authReady = true;
+      render();
+      hydrateFromFirestoreInBackground();
+      return;
+    }
+    setCloudStatus('local');
+    authReady = true;
+    render();
+  });
+} else {
+  setCloudStatus('local');
+  authReady = true;
+  render();
+}
 </script>
 </body>
 </html>
