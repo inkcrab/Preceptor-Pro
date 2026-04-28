@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="preceptor-pro-icon-192.png" />
 <link rel="manifest" href="preceptor-pro-manifest.json" />
 <meta name="theme-color" content="#0b3d91" />
-	<style>
+<style>
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
   body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f6fb;min-height:100vh;}
   button{cursor:pointer;font-family:inherit;}
@@ -77,10 +77,30 @@
   /* Notification bell badge */
   .badge{background:#e74c3c;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;}
   .fast-mode *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
+  .splash-screen{position:fixed;inset:0;background:#0b3d91;display:flex;align-items:center;justify-content:center;z-index:5000;opacity:1;visibility:visible;transition:opacity .35s ease,visibility .35s ease;}
+  .splash-screen.hidden{opacity:0;visibility:hidden;pointer-events:none;}
+  .splash-box{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;color:#fff;animation:splashFade .45s ease;}
+  .splash-logo{width:92px;height:92px;border-radius:24px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);box-shadow:0 10px 24px rgba(0,0,0,.18);margin-bottom:18px;overflow:hidden;}
+  .splash-logo img{width:100%;height:100%;object-fit:cover;}
+  .splash-title{font-size:30px;font-weight:900;letter-spacing:-.5px;margin-bottom:6px;}
+  .splash-sub{font-size:14px;color:#dce6ff;font-weight:600;margin-bottom:18px;}
+  .splash-spinner{width:32px;height:32px;border-radius:50%;border:3px solid rgba(255,255,255,.24);border-top-color:#fff;animation:splashSpin .9s linear infinite;}
+  @keyframes splashSpin{to{transform:rotate(360deg);}}
+  @keyframes splashFade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
   @media(max-width:400px){.fab{right:20px;}}
 </style>
 </head>
 <body>
+<div id="splashScreen" class="splash-screen" aria-live="polite">
+  <div class="splash-box">
+    <div class="splash-logo">
+      <img src="preceptor-pro-icon-192.png" alt="Preceptor Pro"/>
+    </div>
+    <div class="splash-title">Preceptor Pro</div>
+    <div class="splash-sub">Gestión escolar</div>
+    <div class="splash-spinner" aria-hidden="true"></div>
+  </div>
+</div>
 <div class="app" id="app">
   <!-- Rendered by JS -->
 </div>
@@ -191,6 +211,8 @@ let storageEnabled = false;
 let remoteSaveTimer = null;
 let cloudStatusTimer = null;
 let remoteHydrating = false;
+let splashHidden = false;
+let splashMaxTimer = null;
 function scopedStorageKey(k){
   if(!activeUser || !APP_DATA_KEYS.includes(k)) return k;
   return `pp_user_${activeUser.email}_${k}`;
@@ -231,7 +253,8 @@ function syncActiveUserFromFirebase(user){
     activeUser = {
       uid: user.uid,
       email: user.email || '',
-      nombre: user.displayName || user.email || 'Usuario'
+      nombre: user.displayName || user.email || 'Usuario',
+      emailVerified: user.emailVerified === true
     };
     migrateLegacyDataToUser(activeUser.email);
     setActiveUser(activeUser, getAuthPersistencePreference()!=='session');
@@ -270,6 +293,17 @@ function getVisibleUserName(){
   const emailNombre = String(activeUser?.email || firebaseAuth?.currentUser?.email || '').trim();
   if(emailNombre) return emailNombre;
   return 'Preceptor';
+}
+function isPendingEmailVerification(){
+  return !!(firebaseEnabled && firebaseAuth?.currentUser && firebaseAuth.currentUser.emailVerified===false);
+}
+function buildEmailVerificationNotice(){
+  if(!isPendingEmailVerification()) return '';
+  return `<div class="card" style="margin-bottom:16px;background:#fff8e1;border-left:4px solid #f39c12">
+    <div style="font-weight:800;font-size:14px;color:#b26a00;margin-bottom:6px">Tu cuenta no está verificada</div>
+    <div style="font-size:12px;color:#8a6d1f;line-height:1.5;margin-bottom:12px">Te enviamos un correo para verificar tu cuenta. Revisá tu email antes de continuar.</div>
+    <button onclick="reenviarEmailVerificacion()" class="btn-ghost" style="width:auto;padding:10px 14px;color:#b26a00;border-color:#f4d58d">Reenviar email</button>
+  </div>`;
 }
 function isMeaningfulValue(next, current){
   if(typeof next === 'undefined' || next === null) return false;
@@ -514,10 +548,41 @@ function reloadScopedLocalState(){
     }
   }
 }
+function getUserDocRef(uid=activeUser?.uid){
+  if(!firestoreEnabled || !uid) return null;
+  return firestoreDb.collection('users').doc(uid);
+}
 function getFirestoreDocRef(mode){
   if(!firestoreEnabled || !activeUser?.uid) return null;
   if(mode==='legacy') return firestoreDb.collection('users').doc(activeUser.uid).collection('data').doc('appState');
   return firestoreDb.collection('users').doc(activeUser.uid).collection('appData').doc('main');
+}
+async function loadUserPlanFromFirestore(uid=activeUser?.uid){
+  try{
+    const ref = getUserDocRef(uid);
+    if(!ref) return false;
+    const snap = await ref.get();
+    const remotePlan = snap.exists ? snap.data()?.plan : null;
+    state.plan = remotePlan === 'premium' ? 'premium' : 'free';
+    S.set('pp_plan', state.plan);
+    if(remotePlan!=='premium' && remotePlan!=='free'){
+      console.warn('Firestore plan missing or invalid. Defaulting to free.', {uid});
+      try{
+        await ref.set({
+          plan: 'free',
+          email: activeUser?.email || '',
+          nombre: getVisibleUserName() || '',
+          updatedAt: new Date().toISOString()
+        }, {merge:true});
+      }catch(writeErr){
+        console.warn('Could not persist default free plan to Firestore.', writeErr);
+      }
+    }
+    return true;
+  }catch(err){
+    console.error('Firestore user plan load error', err);
+    return false;
+  }
 }
 async function loadDataFromFirestore(){
   try{
@@ -530,9 +595,11 @@ async function loadDataFromFirestore(){
         break;
       }
     }
-    if(!data) return false;
+    const planLoaded = await loadUserPlanFromFirestore();
+    if(!data) return planLoaded;
     remoteHydrating = true;
     applyPersistedState(data);
+    if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
     remoteHydrating = false;
     persistLocalState();
     return true;
@@ -561,17 +628,26 @@ async function saveToFirestore(){
   let nextStatus = 'synced';
   try{
     const ref = getFirestoreDocRef('main');
+    const userRef = getUserDocRef();
     if(!ref){
       nextStatus = 'local';
       return;
     }
-    await ref.set({
-      state: serializePersistedState(),
-      meta: {
-        updatedAt: state._lastModified || new Date().toISOString(),
-        dataKeys: APP_DATA_KEYS
-      }
-    }, {merge:true});
+    await Promise.all([
+      ref.set({
+        state: serializePersistedState(),
+        meta: {
+          updatedAt: state._lastModified || new Date().toISOString(),
+          dataKeys: APP_DATA_KEYS
+        }
+      }, {merge:true}),
+      userRef ? userRef.set({
+        plan: state.plan === 'premium' ? 'premium' : 'free',
+        email: activeUser?.email || '',
+        nombre: getVisibleUserName(),
+        updatedAt: state._lastModified || new Date().toISOString()
+      }, {merge:true}) : Promise.resolve()
+    ]);
   }catch(err){
     console.error('Firestore save error', err);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
@@ -743,10 +819,28 @@ function requirePremiumFeature(msg){
 function canCreateMoreCourses(){
   return isPremiumPlan() || (state.cursos||[]).length < 1;
 }
-function togglePlanForTest(plan){
+async function setUserPlanValue(plan, uid=activeUser?.uid){
   state.plan = plan === 'premium' ? 'premium' : 'free';
+  S.set('pp_plan', state.plan);
+  if(firestoreEnabled && uid){
+    try{
+      const userRef = getUserDocRef(uid);
+      if(userRef){
+        await userRef.set({
+          plan: state.plan,
+          email: activeUser?.email || '',
+          nombre: getVisibleUserName(),
+          updatedAt: new Date().toISOString()
+        }, {merge:true});
+      }
+    }catch(err){
+      console.error('Firestore user plan save error', err);
+    }
+  }
   save();
-  render();
+}
+async function setUserPremium(uid=activeUser?.uid){
+  await setUserPlanValue('premium', uid);
 }
 function ensureDefaultPresentForDate(cursoId, fecha){
   const alumnos = state.alumnos[cursoId]||[];
@@ -859,6 +953,20 @@ function applyColors(){
   document.documentElement.style.setProperty('--accent',state.colors.accent);
   document.documentElement.style.setProperty('--bg',state.colors.bg);
 }
+function hideSplashScreen(){
+  if(splashHidden) return;
+  splashHidden = true;
+  if(splashMaxTimer){
+    clearTimeout(splashMaxTimer);
+    splashMaxTimer = null;
+  }
+  const splash = document.getElementById('splashScreen');
+  if(!splash) return;
+  splash.classList.add('hidden');
+  setTimeout(()=>{
+    if(splash?.parentNode) splash.parentNode.removeChild(splash);
+  }, 450);
+}
 
 // ============================================================
 // RENDER ENGINE
@@ -877,6 +985,7 @@ function render(){
   applyColors();
   const app = document.getElementById('app');
   app.innerHTML = buildApp();
+  requestAnimationFrame(()=>hideSplashScreen());
   attachEvents();
   if(activeId){
     requestAnimationFrame(()=>{
@@ -951,6 +1060,7 @@ function buildAuthScreen(){
         <div style="margin-bottom:12px"><label>NOMBRE</label><input id="auth_nombre" class="inp" placeholder="Tu nombre"/></div>
         <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
         <div style="margin-bottom:16px"><label>CONTRASEÑA</label><input id="auth_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        <div style="font-size:12px;color:#777;line-height:1.5;margin-bottom:14px">Después de crear tu cuenta te enviaremos un correo para verificar tu email.</div>
         <button onclick="registrarUsuario()" class="btn-primary">Crear cuenta</button>
       ` : `
         <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_login_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
@@ -1084,6 +1194,7 @@ function buildHome(){
   }).join('');
 
   return `<div class="screen">
+    ${buildEmailVerificationNotice()}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
       <div>
         <div style="font-size:12px;color:#888;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">${fmtFecha(hoy)}</div>
@@ -1754,6 +1865,7 @@ function buildPerfil(){
       <button class="back-btn" onclick="goHome()">${ICONS.back}</button>
       <span style="font-weight:900;font-size:20px;color:var(--primary)">MI PERFIL</span>
     </div>
+    ${buildEmailVerificationNotice()}
     <div style="text-align:center;margin-bottom:24px">
       <div style="width:90px;height:90px;border-radius:50%;background:color-mix(in srgb,var(--accent) 20%,#fff);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);color:var(--accent);overflow:hidden">
         ${p.foto ? `<img src="${esc(p.foto)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover"/>` : ICONS.user}
@@ -1808,11 +1920,7 @@ function buildConfig(){
           <div style="font-size:16px;color:var(--primary);font-weight:800">${planLabel}</div>
           <div style="font-size:12px;color:#777;margin-top:4px">${isPremiumPlan()?'Cursos ilimitados y funciones avanzadas activas.':'Plan gratuito con 1 curso y funciones básicas.'}</div>
         </div>
-        <button onclick="openModal('premiumPlan')" class="btn-primary" style="width:auto;padding:10px 14px">${isPremiumPlan()?'Ver Premium':'Pasar a Premium'}</button>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button onclick="togglePlanForTest('premium')" class="btn-ghost" style="flex:1;min-width:160px;font-size:12px">Activar Premium prueba</button>
-        <button onclick="togglePlanForTest('free')" class="btn-ghost" style="flex:1;min-width:160px;font-size:12px">Volver a Free prueba</button>
+        ${!isPremiumPlan() ? `<button onclick="openModal('premiumPlan')" class="btn-primary" style="width:auto;padding:10px 14px">Pasar a Premium</button>` : `<div style="background:#effaf3;color:#1f7a3f;border-radius:999px;padding:10px 14px;font-size:12px;font-weight:800">Premium activo</div>`}
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
@@ -2046,7 +2154,6 @@ function buildModalPremiumPlan(){
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <button onclick="solicitarPremiumContacto()" class="btn-primary" style="flex:1;min-width:160px">Solicitar Premium</button>
-      <button onclick="togglePlanForTest('premium');closeModal();" class="btn-ghost" style="flex:1;min-width:160px">Activar Premium prueba</button>
     </div>`;
 }
 
@@ -2223,6 +2330,9 @@ function openModal(type, extra){
     alert('Tu plan gratuito permite 1 curso. Pasá a Premium para crear más cursos.');
     return;
   }
+  if(type==='premiumPlan' && isPremiumPlan()){
+    return;
+  }
   if(type==='cursoEdit'){
     const c=state.cursos.find(x=>x.id===extra);
     setState({modal:'cursoEdit', modalData:c||{}});
@@ -2233,6 +2343,41 @@ function openModal(type, extra){
   }
 }
 function closeModal(){ setState({modal:null, modalData:{}}); }
+function sendFirebaseVerificationEmail(user){
+  const targetUser = firebaseAuth?.currentUser || user || null;
+  if(!(firebaseEnabled && firebaseAuth && targetUser && typeof targetUser.getIdToken === 'function')){
+    return Promise.reject(new Error('auth/no-current-user'));
+  }
+  if(targetUser.emailVerified === true){
+    return Promise.reject(new Error('auth/already-verified'));
+  }
+  return targetUser.getIdToken(true)
+    .then(idToken=>fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        requestType: 'VERIFY_EMAIL',
+        idToken
+      })
+    }))
+    .then(async response=>{
+      let data = {};
+      try{ data = await response.json(); }catch{}
+      if(!response.ok){
+        const message = data?.error?.message || 'verification-email-failed';
+        throw new Error(message);
+      }
+      return true;
+    });
+}
+function verificationEmailErrorMessage(error){
+  const raw = String(error?.code || error?.message || '').toUpperCase();
+  if(raw.includes('AUTH/ALREADY-VERIFIED')) return 'Tu email ya está verificado';
+  if(raw.includes('AUTH/NO-CURRENT-USER')) return 'Iniciá sesión para reenviar';
+  if(raw.includes('TOO_MANY_ATTEMPTS_TRY_LATER') || raw.includes('AUTH/TOO-MANY-REQUESTS')) return 'Esperá unos minutos antes de reenviar';
+  if(raw.includes('USER_DISABLED')) return 'No se pudo reenviar el email';
+  return 'No se pudo reenviar el email';
+}
 
 function registrarUsuario(){
   const nombre = document.getElementById('auth_nombre')?.value?.trim();
@@ -2244,13 +2389,33 @@ function registrarUsuario(){
   }
   if(firebaseEnabled && firebaseAuth){
     firebaseAuth.createUserWithEmailAndPassword(email, password)
-      .then(({user})=>user?.updateProfile ? user.updateProfile({displayName:nombre}) : null)
-      .then(()=>{
+      .then((userCredential)=>{
+        const user = userCredential?.user || firebaseAuth?.currentUser || null;
+        if(!user) throw new Error('firebase-user-not-available');
+        return Promise.resolve(user?.updateProfile ? user.updateProfile({displayName:nombre}) : null).then(()=>user);
+      })
+      .then((user)=>{
         migrateLegacyDataToUser(email);
-        state.userProfile = {nombre, email, uid: firebaseAuth?.currentUser?.uid || ''};
+        state.plan = 'free';
+        S.set('pp_plan', state.plan);
+        state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
         state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
+        const saveUserDoc = getUserDocRef(user.uid || firebaseAuth?.currentUser?.uid)?.set({
+          plan: 'free',
+          email,
+          nombre,
+          updatedAt: new Date().toISOString()
+        }, {merge:true});
+        return Promise.resolve(saveUserDoc)
+          .then(()=>sendFirebaseVerificationEmail(user));
+      })
+      .then(()=>{
+        showToast('Te enviamos un correo de verificación. Revisá tu email.');
+        alert('Te enviamos un correo de verificación. Revisá tu email.');
+        render();
       })
       .catch(err=>{
+        console.error(err);
         alert(firebaseAuthError(err));
       });
     return;
@@ -2263,6 +2428,8 @@ function registrarUsuario(){
   const nuevo = {id:uid(), nombre, email, password};
   try{ localStorage.setItem(AUTH_USERS_KEY, JSON.stringify([...users, nuevo])); }catch{}
   if(!users.length) migrateLegacyDataToUser(email);
+  state.plan = 'free';
+  S.set('pp_plan', state.plan);
   setActiveUser({id:nuevo.id, nombre:nuevo.nombre, email:nuevo.email});
   window.location.reload();
 }
@@ -2277,6 +2444,12 @@ function iniciarSesion(){
     state._rememberLogin = remember;
     firebaseAuth.setPersistence(persistence)
       .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
+      .then((cred)=>{
+        if(cred?.user && cred.user.emailVerified===false){
+          showToast('Tu cuenta no está verificada');
+          alert('Tu cuenta no está verificada. Revisá tu email o reenviá la verificación desde la app.');
+        }
+      })
       .catch(err=>{
         alert(firebaseAuthError(err));
       });
@@ -2315,6 +2488,26 @@ function recuperarContrasena(){
         return;
       }
       alert(code==='auth/invalid-email' ? 'Ingresá un email válido.' : 'Error al enviar el correo');
+    });
+}
+function reenviarEmailVerificacion(){
+  const user = firebaseAuth?.currentUser || null;
+  if(!(firebaseEnabled && firebaseAuth && user)){
+    alert('Iniciá sesión para reenviar');
+    return;
+  }
+  if(user.emailVerified===true){
+    alert('Tu email ya está verificado');
+    return;
+  }
+  sendFirebaseVerificationEmail(user)
+    .then(()=>{
+      showToast('Se envió un correo para verificar la cuenta');
+      alert('Te enviamos un correo para verificar tu cuenta. Revisá tu email antes de continuar.');
+    })
+    .catch((error)=>{
+      console.error(error);
+      alert(verificationEmailErrorMessage(error));
     });
 }
 
@@ -2358,14 +2551,11 @@ function abrirSoporteWhatsApp(){
 
 function solicitarPremiumContacto(){
   if(SUPPORT_WHATSAPP && SUPPORT_WHATSAPP!=='TU_NUMERO'){
-    window.open(`https://wa.me/${SUPPORT_WHATSAPP}`, '_blank');
+    const mensaje = encodeURIComponent('Hola! 👋\nQuiero pasarme a la versión Premium de Preceptor Pro.');
+    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${mensaje}`, '_blank');
     return;
   }
-  if(SUPPORT_EMAIL && SUPPORT_EMAIL!=='TU_EMAIL'){
-    window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Solicitud Premium Preceptor Pro')}`;
-    return;
-  }
-  alert('Configurá un contacto de soporte para solicitar Premium.');
+  alert('Configurá el número de WhatsApp para solicitar Premium.');
 }
 
 function seleccionarFotoPerfil(){
@@ -3238,6 +3428,7 @@ function importarBackup(event){
 // INIT
 // ============================================================
 applyColors();
+splashMaxTimer = setTimeout(()=>hideSplashScreen(), 2000);
 ensureAutoAcapForDate(todayISO());
 window.addEventListener('online', ()=>{
   state._online=true;
@@ -3258,17 +3449,26 @@ setInterval(()=>{
 }, 60000);
 if(initFirebaseAuth() && firebaseAuth){
   firebaseAuth.onAuthStateChanged(user=>{
-    syncActiveUserFromFirebase(user);
-    if(user){
-      reloadScopedLocalState();
+    const finalizeAuth = (resolvedUser)=>{
+      syncActiveUserFromFirebase(resolvedUser);
+      if(resolvedUser){
+        reloadScopedLocalState();
+        authReady = true;
+        render();
+        hydrateFromFirestoreInBackground();
+        return;
+      }
+      setCloudStatus('local');
       authReady = true;
       render();
-      hydrateFromFirestoreInBackground();
+    };
+    if(user?.reload){
+      user.reload()
+        .then(()=>finalizeAuth(firebaseAuth.currentUser || user))
+        .catch(()=>finalizeAuth(firebaseAuth.currentUser || user));
       return;
     }
-    setCloudStatus('local');
-    authReady = true;
-    render();
+    finalizeAuth(user);
   });
 } else {
   setCloudStatus('local');
