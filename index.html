@@ -105,7 +105,7 @@
   <!-- Rendered by JS -->
 </div>
 <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
-<input type="file" id="profilePhotoInput" accept="image/jpeg,image/png,.jpg,.jpeg,.png" style="display:none" onchange="subirFotoPerfil(event)"/>
+<input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="subirFotoPerfil(event)"/>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
@@ -213,6 +213,8 @@ let cloudStatusTimer = null;
 let remoteHydrating = false;
 let splashHidden = false;
 let splashMaxTimer = null;
+let profilePhotoPreviewUrl = '';
+let profilePhotoPreviewObjectUrl = '';
 function scopedStorageKey(k){
   if(!activeUser || !APP_DATA_KEYS.includes(k)) return k;
   return `pp_user_${activeUser.email}_${k}`;
@@ -1860,6 +1862,7 @@ function buildNotas(){
 // ============================================================
 function buildPerfil(){
   const p = state.perfil;
+  const fotoSrc = profilePhotoPreviewUrl || p.foto || '';
   return `<div class="screen">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
       <button class="back-btn" onclick="goHome()">${ICONS.back}</button>
@@ -1868,7 +1871,7 @@ function buildPerfil(){
     ${buildEmailVerificationNotice()}
     <div style="text-align:center;margin-bottom:24px">
       <div style="width:90px;height:90px;border-radius:50%;background:color-mix(in srgb,var(--accent) 20%,#fff);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;border:3px solid var(--accent);color:var(--accent);overflow:hidden">
-        ${p.foto ? `<img src="${esc(p.foto)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover"/>` : ICONS.user}
+        ${fotoSrc ? `<img src="${esc(fotoSrc)}" alt="Foto de perfil" style="width:100%;height:100%;object-fit:cover"/>` : ICONS.user}
       </div>
       <button onclick="seleccionarFotoPerfil()" class="btn-ghost" style="max-width:220px;margin:0 auto 12px">Cambiar foto</button>
     </div>
@@ -2558,6 +2561,48 @@ function solicitarPremiumContacto(){
   alert('Configurá el número de WhatsApp para solicitar Premium.');
 }
 
+function resetProfilePhotoPreview(){
+  if(profilePhotoPreviewObjectUrl){
+    try{ URL.revokeObjectURL(profilePhotoPreviewObjectUrl); }catch{}
+  }
+  profilePhotoPreviewUrl = '';
+  profilePhotoPreviewObjectUrl = '';
+}
+function setProfilePhotoPreview(url, isObjectUrl=false){
+  if(profilePhotoPreviewObjectUrl && profilePhotoPreviewObjectUrl!==url){
+    try{ URL.revokeObjectURL(profilePhotoPreviewObjectUrl); }catch{}
+  }
+  profilePhotoPreviewUrl = url || '';
+  profilePhotoPreviewObjectUrl = isObjectUrl ? (url || '') : '';
+}
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject)=>{
+    try{
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(String(reader.result||''));
+      reader.onerror = ()=>reject(new Error('file-read-error'));
+      reader.readAsDataURL(file);
+    }catch(err){
+      reject(err);
+    }
+  });
+}
+async function saveProfilePhotoLocally(file, successMessage, errorMessage){
+  try{
+    const dataUrl = await readFileAsDataURL(file);
+    if(!dataUrl) throw new Error('empty-image-data');
+    state.perfil = {...(state.perfil||{}), foto:dataUrl};
+    resetProfilePhotoPreview();
+    save();
+    render();
+    if(successMessage) showToast(successMessage);
+    return true;
+  }catch(err){
+    console.error('Profile photo local save error', err);
+    if(errorMessage) showToast(errorMessage);
+    return false;
+  }
+}
 function seleccionarFotoPerfil(){
   const input = document.getElementById('profilePhotoInput');
   if(!input) return;
@@ -2570,38 +2615,47 @@ function subirFotoPerfil(event){
   const file = input?.files?.[0];
   if(!file) return;
   const done = ()=>{ if(input) input.value = ''; };
-  const isValidType = ['image/jpeg','image/png'].includes(file.type);
+  const isValidType = String(file.type||'').startsWith('image/');
   if(!isValidType){
-    alert('Seleccioná una imagen JPG o PNG');
+    showToast('Seleccioná un archivo de imagen');
     done();
     return;
   }
   if(file.size > 2 * 1024 * 1024){
-    alert('La imagen debe pesar como máximo 2 MB');
+    showToast('La imagen debe pesar como máximo 2 MB');
     done();
     return;
   }
+  const previewUrl = URL.createObjectURL(file);
+  setProfilePhotoPreview(previewUrl, true);
+  render();
   if(!(firebaseEnabled && storageEnabled && storageDb && activeUser?.uid)){
-    alert('Error al subir la imagen');
-    done();
+    saveProfilePhotoLocally(file, 'Foto actualizada correctamente', 'Error al subir imagen')
+      .finally(done);
     return;
   }
 
   setCloudStatus('syncing');
   const ref = storageDb.ref().child(`users/${activeUser.uid}/profile.jpg`);
-  ref.put(file, {contentType:file.type, cacheControl:'public,max-age=3600'})
+  ref.put(file, {contentType:file.type || 'image/jpeg', cacheControl:'public,max-age=3600'})
     .then(()=>ref.getDownloadURL())
     .then(url=>{
       if(!url) throw new Error('no-url');
       state.perfil = {...(state.perfil||{}), foto:url};
+      resetProfilePhotoPreview();
       save();
       render();
-      flashToast('Foto actualizada correctamente');
+      showToast('Foto actualizada correctamente');
     })
-    .catch(err=>{
+    .catch(async err=>{
       console.error('Profile photo upload error', err);
       setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
-      alert('Error al subir la imagen');
+      const savedLocally = await saveProfilePhotoLocally(file, '', '');
+      if(savedLocally){
+        showToast('Error al subir imagen. Se guardó solo en este dispositivo.');
+      }else{
+        showToast('Error al subir imagen');
+      }
     })
     .finally(done);
 }
