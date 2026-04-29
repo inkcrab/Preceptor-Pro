@@ -615,6 +615,10 @@ function applyPersistedState(data){
   Object.keys(PERSIST_DEFAULTS).forEach(k=>{
     if(isMeaningfulValue(source[k], state[k])) state[k] = source[k];
   });
+  console.log('Cargando listas:', source.listas);
+  console.log('Cargando listasGlobales:', source.listasGlobales);
+  if(typeof source.listas !== 'undefined') state.listas = source.listas || {};
+  if(typeof source.listasGlobales !== 'undefined') state.listasGlobales = source.listasGlobales || [];
   if(source.config && typeof source.config.fastMode !== 'undefined' && !isMeaningfulValue(source.fastMode, state.fastMode)){
     state.fastMode = source.config.fastMode;
   }
@@ -660,6 +664,11 @@ function getCurrentStatePayload(){
 function hasMeaningfulLocalState(){
   return hasMeaningfulPersistedData(getCurrentStatePayload());
 }
+function hasMeaningfulListState(listas, listasGlobales){
+  const hasListas = !!(listas && typeof listas === 'object' && Object.keys(listas).length);
+  const hasGlobales = Array.isArray(listasGlobales) && listasGlobales.length > 0;
+  return hasListas || hasGlobales;
+}
 function applyRemoteProfileFromUserDoc(data, options={}){
   const remotePerfil = data?.perfil;
   if(!remotePerfil || typeof remotePerfil !== 'object') return false;
@@ -692,6 +701,8 @@ function applyRemoteProfileFromUserDoc(data, options={}){
   return changed;
 }
 function persistLocalState(){
+  console.log('Guardando listas:', state.listas);
+  console.log('Guardando listasGlobales:', state.listasGlobales);
   S.set('pp_perfil',state.perfil);
   S.set('pp_user_profile',state.userProfile);
   S.set('pp_plan',state.plan);
@@ -870,7 +881,10 @@ async function loadDataFromFirestore(){
       return planLoaded;
     }
     remoteHydrating = true;
-    if (hasMeaningfulLocalState()) {
+    const source = data.state && typeof data.state==='object' ? data.state : data;
+    const localHasLists = hasMeaningfulListState(state.listas, state.listasGlobales);
+    const remoteHasLists = hasMeaningfulListState(source?.listas, source?.listasGlobales);
+    if (hasMeaningfulLocalState() && localHasLists && !remoteHasLists) {
       console.log("Usando datos locales como fuente principal");
       await saveToFirestore();
       return true;
@@ -933,6 +947,8 @@ async function saveToFirestore(){
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
     const payload = getCurrentStatePayload();
+    console.log('Guardando listas:', state.listas);
+    console.log('Guardando listasGlobales:', state.listasGlobales);
     if(!ref){
       nextStatus = 'local';
       return;
