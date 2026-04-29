@@ -147,7 +147,7 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto"
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
 const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
 const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
-const supportWhatsapp = '5491123906992';
+const supportWhatsapp = '549XXXXXXXXXX';
 const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = [
@@ -2855,6 +2855,42 @@ function readFileAsDataURL(file){
     }
   });
 }
+function loadImageElement(src){
+  return new Promise((resolve, reject)=>{
+    try{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = ()=>reject(new Error('image-load-error'));
+      img.src = src;
+    }catch(err){
+      reject(err);
+    }
+  });
+}
+async function compressProfileImage(file){
+  const dataUrl = await readFileAsDataURL(file);
+  const img = await loadImageElement(dataUrl);
+  const maxSize = 512;
+  const ratio = Math.min(1, maxSize / Math.max(img.width || 1, img.height || 1));
+  const width = Math.max(1, Math.round((img.width || 1) * ratio));
+  const height = Math.max(1, Math.round((img.height || 1) * ratio));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if(!ctx) throw new Error('canvas-context-error');
+  ctx.drawImage(img, 0, 0, width, height);
+  const outputType = typeof canvas.toDataURL === 'function' && canvas.toDataURL('image/webp').startsWith('data:image/webp')
+    ? 'image/webp'
+    : 'image/jpeg';
+  const blob = await new Promise((resolve, reject)=>{
+    canvas.toBlob(result=>{
+      if(result) resolve(result);
+      else reject(new Error('image-compress-error'));
+    }, outputType, 0.8);
+  });
+  return blob;
+}
 function seleccionarFotoPerfil(){
   const input = document.getElementById('profilePhotoInput');
   if(!input) return;
@@ -2873,8 +2909,8 @@ function subirFotoPerfil(event){
     done();
     return;
   }
-  if(file.size > 2 * 1024 * 1024){
-    showToast('La imagen debe pesar como máximo 2 MB');
+  if(file.size > 10 * 1024 * 1024){
+    showToast('La imagen es demasiado grande. Elegí una menor a 10 MB.');
     done();
     return;
   }
@@ -2889,7 +2925,8 @@ function subirFotoPerfil(event){
 
   setCloudStatus('syncing');
   const ref = storageDb.ref().child(`users/${activeUser.uid}/profile.jpg`);
-  ref.put(file, {contentType:file.type || 'image/jpeg', cacheControl:'public,max-age=3600'})
+  compressProfileImage(file)
+    .then(blob=>ref.put(blob, {contentType:blob.type || 'image/jpeg', cacheControl:'public,max-age=3600'}))
     .then(()=>ref.getDownloadURL())
     .then(url=>{
       if(!url) throw new Error('no-url');
@@ -2908,7 +2945,7 @@ function subirFotoPerfil(event){
       console.error('Profile photo upload error', err);
       setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
       render();
-      showToast('Error al subir imagen');
+      showToast('Error al subir la imagen');
     })
     .finally(done);
 }
