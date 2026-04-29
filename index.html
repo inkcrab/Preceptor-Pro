@@ -762,27 +762,35 @@ function getFirestoreDocRef(mode){
   if(mode==='legacy') return firestoreDb.collection('users').doc(uid).collection('data').doc('appState');
   return firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
 }
-async function ensureUserDirectoryDoc(userLike){
-  const uid = String(userLike?.uid || userLike?.id || '').trim();
-  const email = String(userLike?.email || '').trim().toLowerCase();
-  if(!firestoreEnabled || !uid || !email) return false;
+async function ensureUserDocument(user){
+  const uid = String(user?.uid || user?.id || '').trim();
+  if(!firestoreEnabled || !uid) return false;
+  const email = String(user?.email || '').trim().toLowerCase();
   try{
     const ref = getUserDocRef(uid);
     if(!ref) return false;
     const snap = await ref.get();
-    const current = snap.exists ? (snap.data() || {}) : {};
-    const nextPlan = current.plan === 'premium' ? 'premium' : (current.plan === 'free' ? 'free' : 'free');
-    await ref.set({
-      uid,
-      email,
-      nombre: String(userLike?.displayName || userLike?.nombre || current.nombre || '').trim(),
-      plan: nextPlan,
-      createdAt: current.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    }, {merge:true});
+    const now = new Date().toISOString();
+    if(!snap.exists){
+      await ref.set({
+        uid,
+        email,
+        plan: isAdminEmail(email) ? 'premium' : 'free',
+        createdAt: now,
+        updatedAt: now
+      }, {merge:true});
+    } else {
+      await ref.set({
+        uid,
+        email,
+        updatedAt: now
+      }, {merge:true});
+    }
+    console.log('User document ensured', email);
     return true;
-  }catch(err){
-    console.error('Ensure user doc error', err);
+  }catch(error){
+    console.error('Error ensureUserDocument:', error);
+    showToast('No pude registrar el usuario en la nube');
     return false;
   }
 }
@@ -2961,7 +2969,7 @@ function registrarUsuario(){
         S.set('pp_plan', state.plan);
         state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
         state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
-        const saveUserDoc = ensureUserDirectoryDoc({
+        const saveUserDoc = ensureUserDocument({
           uid: user.uid || firebaseAuth?.currentUser?.uid || '',
           email,
           nombre,
@@ -3008,7 +3016,7 @@ function iniciarSesion(){
     firebaseAuth.setPersistence(persistence)
       .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
       .then((cred)=>{
-        return Promise.resolve(ensureUserDirectoryDoc(cred?.user))
+        return Promise.resolve(ensureUserDocument(cred?.user))
           .then(()=>cred);
       })
       .then((cred)=>{
@@ -4298,7 +4306,7 @@ setInterval(()=>{
       syncActiveUserFromFirebase(resolvedUser);
       if(resolvedUser){
         startLoginProgress(state._loginStatus || 'Cargando tus datos...');
-        await ensureUserDirectoryDoc(resolvedUser);
+        await ensureUserDocument(resolvedUser);
         reloadScopedLocalState();
         authReady = true;
         render();
