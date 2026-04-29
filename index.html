@@ -105,7 +105,7 @@
   <!-- Rendered by JS -->
 </div>
 <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
-<input type="file" id="profilePhotoInput" accept="image/*" style="display:none" onchange="subirFotoPerfil(event)"/>
+<input type="file" id="profilePhotoInput" accept="image/*" style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none" onchange="subirFotoPerfil(event)"/>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore-compat.js"></script>
@@ -147,10 +147,11 @@ const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto"
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
 const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
 const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
-const supportWhatsapp = '5491123906992';
+const supportWhatsapp = '549XXXXXXXXXX';
+const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = [
-  'tuemail@gmail.com'
+  'TU_EMAIL_ADMIN@gmail.com'
 ];
 const AUTH_USERS_KEY = 'pp_auth_users';
 const AUTH_ACTIVE_KEY = 'pp_auth_active';
@@ -297,7 +298,7 @@ function isAdminEmail(email){
   return adminEmails.map(v=>String(v||'').trim().toLowerCase()).includes(String(email||'').trim().toLowerCase());
 }
 function isAdminUser(){
-  return isAdminEmail(activeUser?.email || firebaseAuth?.currentUser?.email || '');
+  return isAdminEmail(firebaseAuth?.currentUser?.email || activeUser?.email || '');
 }
 function getVisibleUserName(){
   const perfilNombre = String(state?.perfil?.nombre||'').trim();
@@ -513,11 +514,10 @@ function applyPersistedState(data){
   }
   if(source.perfil && typeof source.perfil === 'object' && String(source.perfil.foto||'').trim() && !String(source.perfil.foto||'').trim().startsWith('blob:') && !String(source.perfil.foto||'').trim().startsWith('data:')){
     const stamp = source.perfil.fotoUpdatedAt || source._lastModified || data?.meta?.updatedAt || state._lastModified || new Date().toISOString();
-    const clean = String(source.perfil.foto||'').trim().replace(/([?&])t=\d+/g,'').replace(/[?&]$/,'');
     state.perfil = {
       ...(state.perfil||{}),
       ...source.perfil,
-      foto: `${clean}${clean.includes('?') ? '&' : '?'}t=${new Date(stamp).getTime()}`,
+      foto: withProfilePhotoCacheBuster(String(source.perfil.foto||'').trim(), stamp),
       fotoUpdatedAt: stamp
     };
     resetProfilePhotoPreview();
@@ -1356,11 +1356,11 @@ function buildHome(){
   const notifsProx = [];
   if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
     `acap_${hoy}`,
-    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">Hoy hay ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'} con ACAP</div></div></div>`
+    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">Hoy tienen ACAP: ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'}</div><div style="font-size:12px;color:#7d5d00;margin-top:3px">${esc(acapSummary.alumnosHoy.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalHoy>4?'...':''}</div></div></div>`
   ]));
-  if(acapSummary.totalAhora) notifsHoy.push(pushNotif([
+  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
     `acap_now_${hoy}`,
-    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">ACAP ahora: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}</div><div style="font-size:12px;color:#5c6f82">${esc(acapSummary.alumnosAhora.slice(0,3).map(a=>a.nombre).join(', '))}${acapSummary.totalAhora>3?'...':''}</div></div></div>`
+    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">${acapSummary.totalAhora ? `Ahora están en ACAP: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}` : 'No hay alumnos en ACAP ahora'}</div><div style="font-size:12px;color:#5c6f82">${acapSummary.totalAhora ? `${esc(acapSummary.alumnosAhora.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalAhora>4?'...':''}` : 'Se actualizará automáticamente según el horario actual.'}</div></div></div>`
   ]));
   if(ferHoy) notifsHoy.push(pushNotif([
     `feriado_${ferHoy.fecha}`,
@@ -2075,7 +2075,7 @@ function buildNotas(){
 // ============================================================
 function buildPerfil(){
   const p = state.perfil;
-  const fotoSrc = profilePhotoPreviewUrl || p.foto || '';
+  const fotoSrc = profilePhotoPreviewUrl || withProfilePhotoCacheBuster(p.foto || '', p.fotoUpdatedAt || state._lastModified) || '';
   return `<div class="screen">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
       <button class="back-btn" onclick="goHome()">${ICONS.back}</button>
@@ -2389,7 +2389,7 @@ function buildModalPremiumPlan(){
       ${['Cursos ilimitados','Exportar PDF y Excel','Backup completo','Listas globales','Soporte prioritario'].map(item=>`<div style="background:#f8f9fa;border-radius:10px;padding:10px 12px;font-size:13px;color:#333;font-weight:600">• ${item}</div>`).join('')}
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button onclick="solicitarPremiumContacto()" class="btn-primary" style="flex:1;min-width:160px">Solicitar Premium</button>
+      <button onclick="openPremiumWhatsapp()" class="btn-primary" style="flex:1;min-width:160px">Solicitar Premium</button>
     </div>`;
 }
 
@@ -2667,8 +2667,8 @@ function registrarUsuario(){
           .then(()=>sendFirebaseVerificationEmail(user));
       })
       .then(()=>{
-        showToast('Te enviamos un correo de verificación. Revisá tu email.');
-        alert('Te enviamos un correo de verificación. Revisá tu email.');
+        showToast('Email enviado. Revisá también spam o correo no deseado.');
+        alert('Email enviado. Revisá también spam o correo no deseado.');
         render();
       })
       .catch(err=>{
@@ -2805,13 +2805,17 @@ function abrirSoporteWhatsApp(){
   window.open(`https://wa.me/${SUPPORT_WHATSAPP}`, '_blank');
 }
 
-function solicitarPremiumContacto(){
-  if(SUPPORT_WHATSAPP){
-    const mensaje = encodeURIComponent('Hola! Quiero pasarme a Premium en Preceptor Pro.');
-    window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${mensaje}`, '_blank');
+function openPremiumWhatsapp(){
+  if(!supportWhatsapp){
+    alert('Configurá el número de WhatsApp para solicitar Premium.');
     return;
   }
-  alert('Configurá el número de WhatsApp para solicitar Premium.');
+  const url = `https://wa.me/${supportWhatsapp}?text=${encodeURIComponent(premiumMessage)}`;
+  window.open(url, '_blank');
+}
+
+function solicitarPremiumContacto(){
+  openPremiumWhatsapp();
 }
 
 function resetProfilePhotoPreview(){
@@ -2892,7 +2896,7 @@ function subirFotoPerfil(event){
       const stamp = new Date().toISOString();
       state.perfil = {
         ...(state.perfil||{}),
-        foto: withProfilePhotoCacheBuster(url, stamp),
+        foto: String(url||'').trim(),
         fotoUpdatedAt: stamp
       };
       resetProfilePhotoPreview();
