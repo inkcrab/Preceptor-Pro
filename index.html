@@ -688,6 +688,30 @@ function getFirestoreDocRef(mode){
   if(mode==='legacy') return firestoreDb.collection('users').doc(uid).collection('data').doc('appState');
   return firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
 }
+async function ensureUserDirectoryDoc(userLike){
+  const uid = String(userLike?.uid || userLike?.id || '').trim();
+  const email = String(userLike?.email || '').trim().toLowerCase();
+  if(!firestoreEnabled || !uid || !email) return false;
+  try{
+    const ref = getUserDocRef(uid);
+    if(!ref) return false;
+    const snap = await ref.get();
+    const current = snap.exists ? (snap.data() || {}) : {};
+    const nextPlan = current.plan === 'premium' ? 'premium' : (current.plan === 'free' ? 'free' : 'free');
+    await ref.set({
+      uid,
+      email,
+      nombre: String(userLike?.displayName || userLike?.nombre || current.nombre || '').trim(),
+      plan: nextPlan,
+      createdAt: current.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, {merge:true});
+    return true;
+  }catch(err){
+    console.error('Ensure user doc error', err);
+    return false;
+  }
+}
 async function loadUserPlanFromFirestore(uid=activeUser?.uid){
   try{
     const ref = getUserDocRef(uid);
@@ -719,9 +743,11 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
       console.warn('Firestore plan missing or invalid. Defaulting to free.', {uid});
       try{
         await ref.set({
+          uid,
           plan: 'free',
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
+          createdAt: snap.data()?.createdAt || new Date().toISOString(),
           perfil: buildSyncedProfilePayload(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
@@ -800,10 +826,14 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!firestoreEnabled || !uid) return false;
   const userRef = getUserDocRef(uid);
   if(!userRef) return false;
+  const currentSnap = await userRef.get();
+  const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
   await userRef.set({
+    uid,
     plan: plan === 'premium' ? 'premium' : 'free',
-    email: extra.email || '',
-    nombre: extra.nombre || '',
+    email: String(extra.email || current.email || '').trim().toLowerCase(),
+    nombre: extra.nombre || current.nombre || '',
+    createdAt: current.createdAt || new Date().toISOString(),
     perfil: extra.perfil || buildSyncedProfilePayload(),
     updatedAt: new Date().toISOString()
   }, {merge:true});
@@ -834,10 +864,12 @@ async function saveToFirestore(){
         }
       }, {merge:true}),
       userRef ? userRef.set({
+        uid: authUid,
         plan: state.plan === 'premium' ? 'premium' : 'free',
-        email: activeUser?.email || '',
+        email: String(activeUser?.email || '').trim().toLowerCase(),
         nombre: getVisibleUserName(),
         perfil: buildSyncedProfilePayload(),
+        createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
         updatedAt: state._lastModified || new Date().toISOString()
       }, {merge:true}) : Promise.resolve()
     ]);
@@ -1150,7 +1182,7 @@ async function buscarUsuarioAdmin(){
     const snap = await firestoreDb.collection('users').where('email','==', email).limit(1).get();
     if(snap.empty){
       state._adminLookupResult = {exists:false, email};
-      showToast('Usuario no encontrado');
+      showToast('Usuario no encontrado. Ese usuario debe iniciar sesión al menos una vez.');
       render();
       return;
     }
@@ -1188,7 +1220,7 @@ async function actualizarPlanDesdePanelAdmin(plan){
       ...target,
       plan: plan === 'premium' ? 'premium' : 'free'
     };
-    showToast(plan === 'premium' ? 'Usuario actualizado a Premium' : 'Usuario actualizado a Free');
+    showToast('Usuario actualizado correctamente');
     render();
   }catch(err){
     console.error('Admin plan update error', err);
@@ -2840,9 +2872,11 @@ function registrarUsuario(){
         state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
         state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
         const saveUserDoc = getUserDocRef(user.uid || firebaseAuth?.currentUser?.uid)?.set({
+          uid: user.uid || firebaseAuth?.currentUser?.uid || '',
           plan: 'free',
           email,
           nombre,
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
         return Promise.resolve(saveUserDoc)
@@ -4159,12 +4193,13 @@ window.addEventListener('offline', ()=>{
 setInterval(()=>{
   if(state.screen==='home' && !state.modal) render();
 }, 60000);
-if(initFirebaseAuth() && firebaseAuth){
+  if(initFirebaseAuth() && firebaseAuth){
   firebaseAuth.onAuthStateChanged(user=>{
-    const finalizeAuth = (resolvedUser)=>{
+    const finalizeAuth = async (resolvedUser)=>{
       resetScopedState();
       syncActiveUserFromFirebase(resolvedUser);
       if(resolvedUser){
+        await ensureUserDirectoryDoc(resolvedUser);
         reloadScopedLocalState();
         authReady = true;
         if(firestoreEnabled && (typeof navigator==='undefined' || navigator.onLine)){
