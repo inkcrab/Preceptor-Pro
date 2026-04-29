@@ -1288,25 +1288,42 @@ async function actualizarPlanDesdePanelAdmin(plan){
     showToast('Solo el administrador puede actualizar planes');
     return;
   }
+  if(!firestoreEnabled || !firestoreDb){
+    showToast('Firebase no está disponible');
+    return;
+  }
   const target = state._adminLookupResult;
   if(!target?.exists || !target?.uid){
     showToast('Primero buscá un usuario válido');
     return;
   }
   try{
-    await setUserPlanValue(plan, target.uid, {
-      email: target.email || '',
-      nombre: target.nombre || ''
-    });
+    const uid = String(target.uid || '').trim();
+    const normalizedPlan = plan === 'premium' ? 'premium' : 'free';
+    console.log('Activando premium para UID:', uid);
+    const ref = getUserDocRef(uid);
+    if(!ref) throw {code:'firestore/invalid-user-ref', message:'No se pudo obtener la referencia del usuario.'};
+    await ref.set({
+      plan: normalizedPlan,
+      updatedAt: new Date().toISOString()
+    }, {merge:true});
+    const snap = await ref.get();
+    const data = snap.exists ? (snap.data() || {}) : {};
+    console.log('Plan actualizado:', data);
     state._adminLookupResult = {
       ...target,
-      plan: plan === 'premium' ? 'premium' : 'free'
+      uid,
+      email: String(data.email || target.email || '').trim().toLowerCase(),
+      nombre: String(data.nombre || target.nombre || '').trim(),
+      plan: data.plan === 'premium' ? 'premium' : 'free'
     };
-    showToast('Usuario actualizado correctamente');
+    showToast(normalizedPlan === 'premium' ? 'Usuario actualizado a Premium' : 'Usuario actualizado a Free');
     render();
   }catch(err){
     console.error('Admin plan update error', err);
-    showToast('No se pudo actualizar el usuario');
+    const code = err?.code || 'firestore/error';
+    const message = err?.message || 'No se pudo actualizar el usuario';
+    showToast(`${code}: ${message}`);
   }
 }
 async function borrarDatosUsuarioDesdePanelAdmin(){
