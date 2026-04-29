@@ -1069,7 +1069,9 @@ function parseHorarioData(data){
   return {horaDesde:'', horaHasta:''};
 }
 function parseTimeToMinutes(value){
-  const match = String(value||'').trim().match(/^(\d{1,2}):(\d{2})$/);
+  const normalized = String(value||'').trim();
+  const withMinutes = /^\d{1,2}$/.test(normalized) ? `${normalized}:00` : normalized;
+  const match = withMinutes.match(/^(\d{1,2}):(\d{2})$/);
   if(!match) return null;
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -1079,7 +1081,11 @@ function parseTimeToMinutes(value){
 function parseAcapHorario(horario){
   const value = String(horario||'').trim();
   if(!value) return {horaDesde:'', horaHasta:'', start:null, end:null};
-  const rangeMatch = value.match(/(\d{1,2}:\d{2})\s*(?:a|-)\s*(\d{1,2}:\d{2})/i);
+  const normalizedValue = value
+    .replace(/^de\s+/i, '')
+    .replace(/^desde\s+/i, 'Desde ')
+    .replace(/^hasta\s+/i, 'Hasta ');
+  const rangeMatch = normalizedValue.match(/(\d{1,2}(?::\d{2})?)\s*(?:a|-)\s*(\d{1,2}(?::\d{2})?)/i);
   if(rangeMatch){
     const horaDesde = rangeMatch[1];
     const horaHasta = rangeMatch[2];
@@ -1090,7 +1096,7 @@ function parseAcapHorario(horario){
       end: parseTimeToMinutes(horaHasta)
     };
   }
-  const fromMatch = value.match(/^desde\s+(\d{1,2}:\d{2})$/i);
+  const fromMatch = normalizedValue.match(/^desde\s+(\d{1,2}(?::\d{2})?)$/i);
   if(fromMatch){
     const horaDesde = fromMatch[1];
     return {
@@ -1100,7 +1106,7 @@ function parseAcapHorario(horario){
       end:null
     };
   }
-  const toMatch = value.match(/^hasta\s+(\d{1,2}:\d{2})$/i);
+  const toMatch = normalizedValue.match(/^hasta\s+(\d{1,2}(?::\d{2})?)$/i);
   if(toMatch){
     const horaHasta = toMatch[1];
     return {
@@ -1139,8 +1145,9 @@ function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
   const nowMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
   const activeNow = [...alumnosByDay.values()].filter(item=>{
     const parsed = parseAcapHorario(item.horario || buildHorario(item.data?.horaDesde||'', item.data?.horaHasta||''));
-    if(parsed.start===null || parsed.end===null) return false;
-    return nowMinutes >= parsed.start && nowMinutes <= parsed.end;
+    const active = !(parsed.start===null || parsed.end===null) && nowMinutes >= parsed.start && nowMinutes <= parsed.end;
+    console.log('ACAP horario:', item.horario || buildHorario(item.data?.horaDesde||'', item.data?.horaHasta||''), 'parseado:', parsed, 'ahora:', nowMinutes, 'activo:', active);
+    return active;
   });
   return {
     totalHoy: alumnosByDay.size,
