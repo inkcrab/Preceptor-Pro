@@ -1076,37 +1076,75 @@ function parseTimeToMinutes(value){
   if(hours<0 || hours>23 || minutes<0 || minutes>59) return null;
   return hours * 60 + minutes;
 }
+function parseAcapHorario(horario){
+  const value = String(horario||'').trim();
+  if(!value) return {horaDesde:'', horaHasta:'', start:null, end:null};
+  const rangeMatch = value.match(/(\d{1,2}:\d{2})\s*(?:a|-)\s*(\d{1,2}:\d{2})/i);
+  if(rangeMatch){
+    const horaDesde = rangeMatch[1];
+    const horaHasta = rangeMatch[2];
+    return {
+      horaDesde,
+      horaHasta,
+      start: parseTimeToMinutes(horaDesde),
+      end: parseTimeToMinutes(horaHasta)
+    };
+  }
+  const fromMatch = value.match(/^desde\s+(\d{1,2}:\d{2})$/i);
+  if(fromMatch){
+    const horaDesde = fromMatch[1];
+    return {
+      horaDesde,
+      horaHasta:'',
+      start: parseTimeToMinutes(horaDesde),
+      end:null
+    };
+  }
+  const toMatch = value.match(/^hasta\s+(\d{1,2}:\d{2})$/i);
+  if(toMatch){
+    const horaHasta = toMatch[1];
+    return {
+      horaDesde:'',
+      horaHasta,
+      start:null,
+      end: parseTimeToMinutes(horaHasta)
+    };
+  }
+  return {horaDesde:'', horaHasta:'', start:null, end:null};
+}
 function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
-  const byStudent = new Map();
-  Object.entries(state.acaps||{}).forEach(([key, data])=>{
+  const acaps = state.acaps || {};
+  const alumnosByDay = new Map();
+  Object.entries(acaps).forEach(([key, data])=>{
     if(!data) return;
-    const parts = key.split('_');
-    if(parts.length < 3) return;
-    const recordDate = parts.slice(-1)[0];
-    if(recordDate!==fecha) return;
-    const cursoId = parts[0];
-    const alumnoId = parts[1];
-    const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+    const match = String(key).match(/^(.+?)_(.+?)_(\d{4}-\d{2}-\d{2})$/);
+    if(!match) return;
+    const cursoId = match[1];
+    const alumnoId = match[2];
+    const recordDate = match[3];
+    if(recordDate !== fecha) return;
+    const alumno = (state.alumnos?.[cursoId] || []).find(a=>a.id===alumnoId);
     if(!alumno) return;
-    if(!(data?.empresa || data?.horario || data?.horaDesde || data?.horaHasta || data?.lugar)) return;
-    byStudent.set(`${cursoId}_${alumnoId}`, {
+    const dedupeKey = `${cursoId}_${alumnoId}`;
+    if(alumnosByDay.has(dedupeKey)) return;
+    alumnosByDay.set(dedupeKey, {
       cursoId,
       alumnoId,
       nombre: alumno.nombre,
+      empresa: String(data?.empresa || data?.lugar || '').trim(),
+      horario: String(data?.horario || '').trim(),
       data
     });
   });
   const nowMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
-  const activeNow = [...byStudent.values()].filter(item=>{
-    const {horaDesde, horaHasta} = parseHorarioData(item.data);
-    const start = parseTimeToMinutes(horaDesde);
-    const end = parseTimeToMinutes(horaHasta);
-    if(start===null || end===null) return false;
-    return nowMinutes >= start && nowMinutes <= end;
+  const activeNow = [...alumnosByDay.values()].filter(item=>{
+    const parsed = parseAcapHorario(item.horario || buildHorario(item.data?.horaDesde||'', item.data?.horaHasta||''));
+    if(parsed.start===null || parsed.end===null) return false;
+    return nowMinutes >= parsed.start && nowMinutes <= parsed.end;
   });
   return {
-    totalHoy: byStudent.size,
-    alumnosHoy: [...byStudent.values()],
+    totalHoy: alumnosByDay.size,
+    alumnosHoy: [...alumnosByDay.values()],
     totalAhora: activeNow.length,
     alumnosAhora: activeNow
   };
@@ -1670,13 +1708,13 @@ function buildHome(){
 
   const notifsHoy = [];
   const notifsProx = [];
-  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
+  notifsHoy.push(pushNotif([
     `acap_${hoy}`,
-    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">Hoy tienen ACAP: ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'}</div><div style="font-size:12px;color:#7d5d00;margin-top:3px">${esc(acapSummary.alumnosHoy.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalHoy>4?'...':''}</div></div></div>`
+    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">${acapSummary.totalHoy ? `Hoy tienen ACAP: ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'}` : 'No hay alumnos con ACAP hoy'}</div>${acapSummary.totalHoy ? `<div style="font-size:12px;color:#7d5d00;margin-top:4px;line-height:1.45">${acapSummary.alumnosHoy.slice(0,4).map(a=>`- ${esc(a.nombre)}${a.empresa?` — ${esc(a.empresa)}`:''} — ${esc(a.horario || 'Sin horario')}`).join('<br/>')}${acapSummary.totalHoy>4?'<br/>...':''}</div>` : ''}</div></div>`
   ]));
-  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
+  notifsHoy.push(pushNotif([
     `acap_now_${hoy}`,
-    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">${acapSummary.totalAhora ? `Ahora están en ACAP: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}` : 'No hay alumnos en ACAP ahora'}</div><div style="font-size:12px;color:#5c6f82">${acapSummary.totalAhora ? `${esc(acapSummary.alumnosAhora.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalAhora>4?'...':''}` : 'Se actualizará automáticamente según el horario actual.'}</div></div></div>`
+    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">ACAP ahora</div><div style="font-size:12px;color:#5c6f82">${acapSummary.totalAhora ? `Ahora están en ACAP: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}` : 'No hay alumnos en ACAP ahora'}</div>${acapSummary.totalAhora ? `<div style="font-size:12px;color:#4c6175;margin-top:4px;line-height:1.45">${acapSummary.alumnosAhora.slice(0,4).map(a=>`- ${esc(a.nombre)}${a.empresa?` — ${esc(a.empresa)}`:''} — ${esc(a.horario || 'Sin horario')}`).join('<br/>')}${acapSummary.totalAhora>4?'<br/>...':''}</div>` : ''}</div></div>`
   ]));
   if(ferHoy) notifsHoy.push(pushNotif([
     `feriado_${ferHoy.fecha}`,
