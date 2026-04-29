@@ -220,6 +220,8 @@ let splashMaxTimer = null;
 let lastRemoteUserDoc = null;
 let profilePhotoPreviewUrl = '';
 let profilePhotoPreviewObjectUrl = '';
+let loginSlowTimer = null;
+let loginContinueTimer = null;
 function getActiveUserUid(){
   return String(activeUser?.uid || activeUser?.id || firebaseAuth?.currentUser?.uid || '').trim();
 }
@@ -426,6 +428,12 @@ let state = {
   _notasOnlyImportant: false,
   _authMode: 'login',
   _rememberLogin: getAuthPersistencePreference()!=='session',
+  _loginBusy: false,
+  _loginStatus: '',
+  _loginSlow: false,
+  _loginCanContinue: false,
+  _loginError: '',
+  _loginContinueDismissed: false,
   _cloudStatus: 'local',
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
@@ -487,6 +495,12 @@ function resetScopedState(options={}){
   state._notasOnlyImportant = false;
   state._authMode = authMode;
   state._rememberLogin = rememberLogin;
+  state._loginBusy = false;
+  state._loginStatus = '';
+  state._loginSlow = false;
+  state._loginCanContinue = false;
+  state._loginError = '';
+  state._loginContinueDismissed = false;
   state._cloudStatus = 'local';
   state._toast = null;
   state.modal = null;
@@ -495,7 +509,67 @@ function resetScopedState(options={}){
   remoteHydrating = false;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
+  clearTimeout(loginSlowTimer);
+  clearTimeout(loginContinueTimer);
+  loginSlowTimer = null;
+  loginContinueTimer = null;
   resetProfilePhotoPreview();
+}
+function startLoginProgress(message){
+  clearTimeout(loginSlowTimer);
+  clearTimeout(loginContinueTimer);
+  state._loginBusy = true;
+  state._loginStatus = message || 'Ingresando...';
+  state._loginSlow = false;
+  state._loginCanContinue = false;
+  state._loginError = '';
+  state._loginContinueDismissed = false;
+  loginSlowTimer = setTimeout(()=>{
+    state._loginSlow = true;
+    if(!activeUser) render();
+    else if(state._loginBusy && !state._loginContinueDismissed) render();
+  }, 5000);
+  loginContinueTimer = setTimeout(()=>{
+    state._loginCanContinue = true;
+    if(!activeUser) render();
+    else if(state._loginBusy && !state._loginContinueDismissed) render();
+  }, 12000);
+}
+function updateLoginProgress(message){
+  state._loginBusy = true;
+  state._loginStatus = message || state._loginStatus || 'Cargando tus datos...';
+  state._loginError = '';
+  render();
+}
+function finishLoginProgress(){
+  clearTimeout(loginSlowTimer);
+  clearTimeout(loginContinueTimer);
+  loginSlowTimer = null;
+  loginContinueTimer = null;
+  state._loginBusy = false;
+  state._loginStatus = '';
+  state._loginSlow = false;
+  state._loginCanContinue = false;
+  state._loginError = '';
+  state._loginContinueDismissed = false;
+}
+function failLoginProgress(message, err){
+  clearTimeout(loginSlowTimer);
+  clearTimeout(loginContinueTimer);
+  loginSlowTimer = null;
+  loginContinueTimer = null;
+  state._loginBusy = false;
+  state._loginStatus = '';
+  state._loginSlow = false;
+  state._loginCanContinue = false;
+  state._loginContinueDismissed = false;
+  state._loginError = String(message || 'No se pudo iniciar sesión.');
+  if(err) console.error(err);
+  render();
+}
+function continuarConDatosDisponibles(){
+  state._loginContinueDismissed = true;
+  render();
 }
 function serializePersistedState(){
   return {
@@ -1443,12 +1517,23 @@ function buildApp(){
     local: {text:'Guardado local / sin conexión', bg:'#f3f4f6', color:'#666'},
   };
   const cloudUi = cloudStatusMap[state._cloudStatus||'local'];
+  const loginLoadingOverlay = (activeUser && state._loginBusy && !state._loginContinueDismissed) ? `
+      <div style="position:fixed;inset:0;z-index:3200;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;padding:24px">
+        <div class="card" style="max-width:420px;width:100%;text-align:center">
+          <div style="font-weight:900;font-size:20px;color:var(--primary);margin-bottom:8px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
+          <div style="font-size:15px;color:#333;font-weight:700;margin-bottom:8px">${esc(state._loginStatus || 'Cargando tus datos...')}</div>
+          <div style="width:42px;height:42px;border:4px solid #dbe4ff;border-top-color:var(--accent);border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite"></div>
+          ${state._loginSlow ? `<div style="font-size:13px;color:#777;line-height:1.5;margin-bottom:10px">Está tardando un poco más de lo normal...</div>` : ``}
+          ${state._loginCanContinue ? `<button onclick="continuarConDatosDisponibles()" class="btn-ghost" style="width:auto;padding:10px 14px">Continuar con datos disponibles</button>` : ``}
+        </div>
+      </div>` : '';
   return `
     <div>
       ${html}
       ${showNav ? buildBottomNav() : ''}
       ${showFab ? `<button class="fab" onclick="openModal('curso')">+</button>` : ''}
       ${state.modal ? buildModal() : ''}
+      ${loginLoadingOverlay}
       ${activeUser ? `<div style="position:fixed;right:12px;bottom:${showNav?76:18}px;z-index:2500;background:${cloudUi.bg};color:${cloudUi.color};padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(cloudUi.text)}</div>` : ''}
       ${state._toast ? `<div style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:3000;background:#1f7a3f;color:#fff;padding:10px 14px;border-radius:12px;font-size:12px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.18)">${esc(state._toast)}</div>` : ''}
     </div>
@@ -1458,6 +1543,7 @@ function buildApp(){
 function buildAuthScreen(){
   const mode = state._authMode==='register' ? 'register' : 'login';
   const remember = state._rememberLogin !== false;
+  const loginButtonText = state._loginBusy ? 'Ingresando...' : 'Iniciar sesión';
   return `<div class="screen" style="max-width:500px;margin:0 auto;padding-top:42px">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:28px;font-weight:900;color:var(--primary);letter-spacing:-.5px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
@@ -1477,6 +1563,9 @@ function buildAuthScreen(){
       ` : `
         <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_login_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
         <div style="margin-bottom:12px"><label>CONTRASEÑA</label><input id="auth_login_pass" class="inp" type="password" placeholder="Contraseña"/></div>
+        ${state._loginStatus ? `<div style="font-size:12px;color:var(--accent);font-weight:700;line-height:1.5;margin-bottom:10px">${esc(state._loginStatus)}</div>` : ``}
+        ${state._loginSlow ? `<div style="font-size:12px;color:#777;line-height:1.5;margin-bottom:10px">Está tardando un poco más de lo normal...</div>` : ``}
+        ${state._loginError ? `<div style="font-size:12px;color:#c0392b;font-weight:700;line-height:1.5;margin-bottom:10px">${esc(state._loginError)}</div>` : ``}
         <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer">
           <input type="checkbox" id="auth_remember" ${remember?'checked':''} onchange="setRememberLogin(this.checked)" style="margin-top:3px"/>
           <span style="font-size:13px;color:#555;line-height:1.4">
@@ -1484,7 +1573,8 @@ function buildAuthScreen(){
             <span style="font-size:12px;color:#777">Si no marcás esta opción, tendrás que iniciar sesión nuevamente al volver a abrir la app.</span>
           </span>
         </label>
-        <button onclick="iniciarSesion()" class="btn-primary">Iniciar sesión</button>
+        <button onclick="iniciarSesion()" class="btn-primary" ${state._loginBusy?'disabled style="opacity:.7;cursor:not-allowed"':''}>${loginButtonText}</button>
+        ${state._loginCanContinue && !activeUser ? `<button onclick="continuarConDatosDisponibles()" class="btn-ghost" style="margin-top:10px">Continuar con datos disponibles</button>` : ``}
         <button onclick="recuperarContrasena()" style="margin-top:10px;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;width:100%">Olvidé mi contraseña</button>
       `}
     </div>
@@ -2908,9 +2998,11 @@ function registrarUsuario(){
 }
 
 function iniciarSesion(){
+  if(state._loginBusy) return;
   const email = (document.getElementById('auth_login_email')?.value||'').trim().toLowerCase();
   const password = document.getElementById('auth_login_pass')?.value || '';
   const remember = document.getElementById('auth_remember')?.checked !== false;
+  startLoginProgress('Ingresando...');
   if(firebaseEnabled && firebaseAuth){
     const persistence = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
     setAuthPersistencePreference(remember);
@@ -2918,23 +3010,27 @@ function iniciarSesion(){
     firebaseAuth.setPersistence(persistence)
       .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
       .then((cred)=>{
+        updateLoginProgress('Cargando tus datos...');
         if(cred?.user && cred.user.emailVerified===false){
           showToast('Tu cuenta no está verificada');
           alert('Tu cuenta no está verificada. Revisá tu email o reenviá la verificación desde la app.');
         }
       })
       .catch(err=>{
+        failLoginProgress(firebaseAuthError(err), err);
         alert(firebaseAuthError(err));
       });
     return;
   }
   const user = getStoredUsers().find(u=>u.email===email && u.password===password);
   if(!user){
+    failLoginProgress('Email o contraseña incorrectos');
     alert('Email o contraseña incorrectos');
     return;
   }
   setAuthPersistencePreference(remember);
   state._rememberLogin = remember;
+  updateLoginProgress('Cargando tus datos...');
   setActiveUser({uid:user.id, id:user.id, nombre:user.nombre, email:user.email}, remember);
   window.location.reload();
 }
@@ -4199,26 +4295,32 @@ setInterval(()=>{
       resetScopedState();
       syncActiveUserFromFirebase(resolvedUser);
       if(resolvedUser){
+        startLoginProgress(state._loginStatus || 'Cargando tus datos...');
         await ensureUserDirectoryDoc(resolvedUser);
         reloadScopedLocalState();
         authReady = true;
+        render();
         if(firestoreEnabled && (typeof navigator==='undefined' || navigator.onLine)){
           setCloudStatus('syncing');
           loadDataFromFirestore()
             .then(()=>{
+              finishLoginProgress();
               render();
               setCloudStatus('synced');
             })
             .catch(err=>{
               console.error('Initial Firestore load error', err);
+              failLoginProgress('No se pudieron cargar tus datos. Podés continuar con los disponibles.', err);
               setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
               render();
             });
           return;
         }
+        finishLoginProgress();
         render();
         return;
       }
+      finishLoginProgress();
       setCloudStatus('local');
       authReady = true;
       render();
