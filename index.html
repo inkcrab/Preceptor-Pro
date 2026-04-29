@@ -146,8 +146,12 @@ const HORAS = ["12:30 - 13:10","13:10 - 13:50","13:50 - 14:30","14:40 - 15:20","
 const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DIAS_CORTOS = ["D","L","M","X","J","V","S"];
 const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
-const SUPPORT_EMAIL = 'TU_EMAIL';
-const SUPPORT_WHATSAPP = 'TU_NUMERO';
+const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
+const supportWhatsapp = '549XXXXXXXXXX';
+const SUPPORT_WHATSAPP = supportWhatsapp;
+const adminEmails = [
+  'tuemail@gmail.com'
+];
 const AUTH_USERS_KEY = 'pp_auth_users';
 const AUTH_ACTIVE_KEY = 'pp_auth_active';
 const AUTH_ACTIVE_SESSION_KEY = 'pp_auth_active_session';
@@ -269,6 +273,10 @@ function syncActiveUserFromFirebase(user){
     if((!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) && String(activeUser.nombre||'').trim()){
       state.perfil = {...(state.perfil||{}), nombre: activeUser.nombre};
     }
+    if(isAdminEmail(activeUser.email)){
+      state.plan = 'premium';
+      S.set('pp_plan', state.plan);
+    }
   } else {
     activeUser = null;
     clearActiveUser();
@@ -284,6 +292,12 @@ function getFutureCloudPayload(){
 function deepCopy(v){return JSON.parse(JSON.stringify(v));}
 function isPlaceholderProfileName(name){
   return PERFIL_NAME_PLACEHOLDERS.includes(String(name||'').trim().toLowerCase());
+}
+function isAdminEmail(email){
+  return adminEmails.map(v=>String(v||'').trim().toLowerCase()).includes(String(email||'').trim().toLowerCase());
+}
+function isAdminUser(){
+  return isAdminEmail(activeUser?.email || firebaseAuth?.currentUser?.email || '');
 }
 function getVisibleUserName(){
   const perfilNombre = String(state?.perfil?.nombre||'').trim();
@@ -497,6 +511,17 @@ function applyPersistedState(data){
   if((!state.perfil || !String(state.perfil.nombre||'').trim() || isPlaceholderProfileName(state.perfil.nombre)) && source.userProfile?.nombre){
     state.perfil = {...(state.perfil||{}), nombre: source.userProfile.nombre};
   }
+  if(source.perfil && typeof source.perfil === 'object' && String(source.perfil.foto||'').trim() && !String(source.perfil.foto||'').trim().startsWith('blob:') && !String(source.perfil.foto||'').trim().startsWith('data:')){
+    const stamp = source.perfil.fotoUpdatedAt || source._lastModified || data?.meta?.updatedAt || state._lastModified || new Date().toISOString();
+    const clean = String(source.perfil.foto||'').trim().replace(/([?&])t=\d+/g,'').replace(/[?&]$/,'');
+    state.perfil = {
+      ...(state.perfil||{}),
+      ...source.perfil,
+      foto: `${clean}${clean.includes('?') ? '&' : '?'}t=${new Date(stamp).getTime()}`,
+      fotoUpdatedAt: stamp
+    };
+    resetProfilePhotoPreview();
+  }
 }
 function persistLocalState(){
   S.set('pp_perfil',state.perfil);
@@ -549,6 +574,10 @@ function reloadScopedLocalState(){
       state.perfil = {...(state.perfil||{}), nombre: visibleName};
     }
   }
+  if(isAdminUser()){
+    state.plan = 'premium';
+    S.set('pp_plan', state.plan);
+  }
 }
 function getUserDocRef(uid=activeUser?.uid){
   if(!firestoreEnabled || !uid) return null;
@@ -564,6 +593,21 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
     const ref = getUserDocRef(uid);
     if(!ref) return false;
     const snap = await ref.get();
+    if(isAdminEmail(activeUser?.email || snap.data()?.email || '')){
+      state.plan = 'premium';
+      S.set('pp_plan', state.plan);
+      try{
+        await ref.set({
+          plan: 'premium',
+          email: activeUser?.email || snap.data()?.email || '',
+          nombre: getVisibleUserName() || '',
+          updatedAt: new Date().toISOString()
+        }, {merge:true});
+      }catch(writeErr){
+        console.warn('Could not persist admin premium plan to Firestore.', writeErr);
+      }
+      return true;
+    }
     const remotePlan = snap.exists ? snap.data()?.plan : null;
     state.plan = remotePlan === 'premium' ? 'premium' : 'free';
     S.set('pp_plan', state.plan);
@@ -601,7 +645,8 @@ async function loadDataFromFirestore(){
     if(!data) return planLoaded;
     remoteHydrating = true;
     applyPersistedState(data);
-    if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
+    if(isAdminUser()) state.plan = 'premium';
+    else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
     remoteHydrating = false;
     persistLocalState();
     return true;
@@ -626,6 +671,18 @@ function queueFirestoreSave(){
   setCloudStatus('syncing');
   remoteSaveTimer = setTimeout(()=>{ saveToFirestore(); }, 500);
 }
+async function upsertRemoteUserPlan(uid, plan, extra={}){
+  if(!firestoreEnabled || !uid) return false;
+  const userRef = getUserDocRef(uid);
+  if(!userRef) return false;
+  await userRef.set({
+    plan: plan === 'premium' ? 'premium' : 'free',
+    email: extra.email || '',
+    nombre: extra.nombre || '',
+    updatedAt: new Date().toISOString()
+  }, {merge:true});
+  return true;
+}
 async function saveToFirestore(){
   let nextStatus = 'synced';
   try{
@@ -643,12 +700,10 @@ async function saveToFirestore(){
           dataKeys: APP_DATA_KEYS
         }
       }, {merge:true}),
-      userRef ? userRef.set({
-        plan: state.plan === 'premium' ? 'premium' : 'free',
+      userRef ? upsertRemoteUserPlan(activeUser?.uid, state.plan, {
         email: activeUser?.email || '',
-        nombre: getVisibleUserName(),
-        updatedAt: state._lastModified || new Date().toISOString()
-      }, {merge:true}) : Promise.resolve()
+        nombre: getVisibleUserName()
+      }) : Promise.resolve()
     ]);
   }catch(err){
     console.error('Firestore save error', err);
@@ -757,6 +812,49 @@ function parseHorarioData(data){
   if(/^Hasta\s+/i.test(horario)) return {horaDesde:'', horaHasta:horario.replace(/^Hasta\s+/i,'').trim()};
   return {horaDesde:'', horaHasta:''};
 }
+function parseTimeToMinutes(value){
+  const match = String(value||'').trim().match(/^(\d{1,2}):(\d{2})$/);
+  if(!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if(hours<0 || hours>23 || minutes<0 || minutes>59) return null;
+  return hours * 60 + minutes;
+}
+function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
+  const byStudent = new Map();
+  Object.entries(state.acaps||{}).forEach(([key, data])=>{
+    if(!data) return;
+    const parts = key.split('_');
+    if(parts.length < 3) return;
+    const recordDate = parts.slice(-1)[0];
+    if(recordDate!==fecha) return;
+    const cursoId = parts[0];
+    const alumnoId = parts[1];
+    const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
+    if(!alumno) return;
+    if(!(data?.empresa || data?.horario || data?.horaDesde || data?.horaHasta || data?.lugar)) return;
+    byStudent.set(`${cursoId}_${alumnoId}`, {
+      cursoId,
+      alumnoId,
+      nombre: alumno.nombre,
+      data
+    });
+  });
+  const nowMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
+  const activeNow = [...byStudent.values()].filter(item=>{
+    const {horaDesde, horaHasta} = parseHorarioData(item.data);
+    const start = parseTimeToMinutes(horaDesde);
+    const end = parseTimeToMinutes(horaHasta);
+    if(start===null || end===null) return false;
+    return nowMinutes >= start && nowMinutes <= end;
+  });
+  return {
+    totalHoy: byStudent.size,
+    alumnosHoy: [...byStudent.values()],
+    totalAhora: activeNow.length,
+    alumnosAhora: activeNow
+  };
+}
 function getAcapEntriesForAlumno(cursoId, alumnoId, opts){
   const {desde='', hasta=''} = opts||{};
   return Object.entries(state.acaps)
@@ -821,28 +919,139 @@ function requirePremiumFeature(msg){
 function canCreateMoreCourses(){
   return isPremiumPlan() || (state.cursos||[]).length < 1;
 }
-async function setUserPlanValue(plan, uid=activeUser?.uid){
-  state.plan = plan === 'premium' ? 'premium' : 'free';
-  S.set('pp_plan', state.plan);
+async function setUserPlanValue(plan, uid=activeUser?.uid, extra={}){
+  const normalizedPlan = plan === 'premium' ? 'premium' : 'free';
+  const isCurrentUser = uid && uid === activeUser?.uid;
+  if(isCurrentUser){
+    state.plan = normalizedPlan;
+    S.set('pp_plan', state.plan);
+  }
   if(firestoreEnabled && uid){
     try{
-      const userRef = getUserDocRef(uid);
-      if(userRef){
-        await userRef.set({
-          plan: state.plan,
-          email: activeUser?.email || '',
-          nombre: getVisibleUserName(),
-          updatedAt: new Date().toISOString()
-        }, {merge:true});
-      }
+      await upsertRemoteUserPlan(uid, normalizedPlan, {
+        email: extra.email || (isCurrentUser ? (activeUser?.email || '') : ''),
+        nombre: extra.nombre || (isCurrentUser ? getVisibleUserName() : '')
+      });
     }catch(err){
       console.error('Firestore user plan save error', err);
     }
   }
-  save();
+  if(isCurrentUser){
+    save();
+  }
 }
 async function setUserPremium(uid=activeUser?.uid){
   await setUserPlanValue('premium', uid);
+}
+async function activarPremiumUsuarioPrompt(){
+  if(!isAdminUser()){
+    showToast('Solo el administrador puede activar Premium');
+    return;
+  }
+  if(!firestoreEnabled){
+    showToast('Firebase no está disponible');
+    return;
+  }
+  const query = String(prompt('Ingresá el email o UID del usuario a activar como Premium:') || '').trim();
+  if(!query) return;
+  try{
+    let targetUid = query;
+    let targetEmail = '';
+    let targetName = '';
+    if(query.includes('@')){
+      const snap = await firestoreDb.collection('users').where('email','==', query.toLowerCase()).limit(1).get();
+      if(snap.empty){
+        showToast('No se encontró un usuario con ese email');
+        return;
+      }
+      const doc = snap.docs[0];
+      targetUid = doc.id;
+      targetEmail = String(doc.data()?.email || query).toLowerCase();
+      targetName = String(doc.data()?.nombre || '').trim();
+    } else {
+      const doc = await getUserDocRef(query)?.get();
+      if(doc?.exists){
+        targetEmail = String(doc.data()?.email || '').trim().toLowerCase();
+        targetName = String(doc.data()?.nombre || '').trim();
+      }
+    }
+    if(!targetUid){
+      showToast('No se pudo identificar al usuario');
+      return;
+    }
+    await setUserPlanValue('premium', targetUid, {email: targetEmail, nombre: targetName});
+    showToast('Premium activado correctamente');
+    render();
+  }catch(err){
+    console.error('Admin premium activation error', err);
+    showToast('No se pudo activar Premium');
+  }
+}
+async function buscarUsuarioAdmin(){
+  if(!isAdminUser()){
+    showToast('Solo el administrador puede usar este panel');
+    return;
+  }
+  if(!firestoreEnabled || !firestoreDb){
+    showToast('Firebase no está disponible');
+    return;
+  }
+  const email = String(document.getElementById('admin_user_email')?.value || '').trim().toLowerCase();
+  state._adminLookupEmail = email;
+  if(!email){
+    state._adminLookupResult = null;
+    showToast('Ingresá un email');
+    render();
+    return;
+  }
+  try{
+    const snap = await firestoreDb.collection('users').where('email','==', email).limit(1).get();
+    if(snap.empty){
+      state._adminLookupResult = {exists:false, email};
+      showToast('Usuario no encontrado');
+      render();
+      return;
+    }
+    const doc = snap.docs[0];
+    const data = doc.data() || {};
+    state._adminLookupResult = {
+      exists: true,
+      uid: doc.id,
+      email: String(data.email || email).trim().toLowerCase(),
+      nombre: String(data.nombre || '').trim(),
+      plan: data.plan === 'premium' ? 'premium' : 'free'
+    };
+    render();
+  }catch(err){
+    console.error('Admin user search error', err);
+    showToast('No se pudo buscar el usuario');
+  }
+}
+async function actualizarPlanDesdePanelAdmin(plan){
+  if(!isAdminUser()){
+    showToast('Solo el administrador puede actualizar planes');
+    return;
+  }
+  const target = state._adminLookupResult;
+  if(!target?.exists || !target?.uid){
+    showToast('Primero buscá un usuario válido');
+    return;
+  }
+  try{
+    await setUserPlanValue(plan, target.uid, {
+      email: target.email || '',
+      nombre: target.nombre || ''
+    });
+    state._adminLookupResult = {
+      ...target,
+      plan: plan === 'premium' ? 'premium' : 'free'
+    };
+    showToast('Usuario actualizado correctamente');
+    render();
+  }catch(err){
+    console.error('Admin plan update error', err);
+    showToast('No se pudo actualizar el usuario');
+  }
 }
 function ensureDefaultPresentForDate(cursoId, fecha){
   const alumnos = state.alumnos[cursoId]||[];
@@ -1128,7 +1337,7 @@ function buildHome(){
   const emoji = h<12?'🌅':h<20?'☀️':'🌙';
   const ferHoy = FERIADOS.find(f=>f.fecha===hoy);
   const evsHoy = state.eventos.filter(e=>e.fecha===hoy);
-  const acapsHoy = [...new Set(Object.keys(state.acaps).filter(k=>k.endsWith('_'+hoy)&&state.acaps[k]).map(k=>k.split('_').slice(0,2).join('_')))];
+  const acapSummary = getAcapNotificationSummary(hoy, new Date());
   const proxEvs = state.eventos.filter(e=>{
     const diff = Math.round((isoToDate(e.fecha)-isoToDate(hoy))/86400000);
     return diff>=1 && diff<=7;
@@ -1145,9 +1354,13 @@ function buildHome(){
 
   const notifsHoy = [];
   const notifsProx = [];
-  if(acapsHoy.length) notifsHoy.push(pushNotif([
+  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
     `acap_${hoy}`,
-    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP hoy: ${acapsHoy.length} alumno${acapsHoy.length===1?'':'s'}</div></div></div>`
+    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">Hoy hay ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'} con ACAP</div></div></div>`
+  ]));
+  if(acapSummary.totalAhora) notifsHoy.push(pushNotif([
+    `acap_now_${hoy}`,
+    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">ACAP ahora: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}</div><div style="font-size:12px;color:#5c6f82">${esc(acapSummary.alumnosAhora.slice(0,3).map(a=>a.nombre).join(', '))}${acapSummary.totalAhora>3?'...':''}</div></div></div>`
   ]));
   if(ferHoy) notifsHoy.push(pushNotif([
     `feriado_${ferHoy.fecha}`,
@@ -1886,7 +2099,7 @@ function buildPerfil(){
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">SOPORTE</div>
       <div style="font-size:13px;color:#666;line-height:1.5;margin-bottom:12px">¿Tenés un problema o sugerencia? Contactanos.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button onclick="abrirSoporteEmail()" class="btn-primary" style="flex:1;min-width:150px">Enviar email</button>
+        <button onclick="abrirSoporteEmail()" class="btn-primary" style="flex:1;min-width:150px">Contactar por Email</button>
         <button onclick="abrirSoporteWhatsApp()" class="btn-ghost" style="flex:1;min-width:150px">WhatsApp</button>
       </div>
     </div>
@@ -1899,6 +2112,7 @@ function buildPerfil(){
 function buildConfig(){
   const cols = state.colors;
   const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
+  const adminLookup = state._adminLookupResult || null;
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -1926,6 +2140,25 @@ function buildConfig(){
         ${!isPremiumPlan() ? `<button onclick="openModal('premiumPlan')" class="btn-primary" style="width:auto;padding:10px 14px">Pasar a Premium</button>` : `<div style="background:#effaf3;color:#1f7a3f;border-radius:999px;padding:10px 14px;font-size:12px;font-weight:800">Premium activo</div>`}
       </div>
     </div>
+    ${isAdminUser() ? `<div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">PANEL ADMIN</div>
+      <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Buscá un usuario por email para cambiar su plan.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <input id="admin_user_email" class="inp" type="email" value="${esc(state._adminLookupEmail||'')}" placeholder="usuario@correo.com" style="flex:1;min-width:220px"/>
+        <button onclick="buscarUsuarioAdmin()" class="btn-primary" style="width:auto;padding:10px 14px">Buscar usuario</button>
+      </div>
+      ${adminLookup ? (adminLookup.exists ? `
+        <div style="background:#f8f9fa;border:1px solid #e6e9ef;border-radius:12px;padding:12px">
+          <div style="font-size:14px;color:var(--primary);font-weight:800;margin-bottom:4px">${esc(adminLookup.nombre || adminLookup.email)}</div>
+          <div style="font-size:12px;color:#666;margin-bottom:4px">${esc(adminLookup.email)}</div>
+          <div style="font-size:12px;color:#666;margin-bottom:12px">Plan actual: <strong style="color:${adminLookup.plan==='premium'?'#1f7a3f':'#555'}">${adminLookup.plan==='premium'?'Premium':'Free'}</strong></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button onclick="actualizarPlanDesdePanelAdmin('premium')" class="btn-primary" style="width:auto;padding:10px 14px">Activar Premium</button>
+            <button onclick="actualizarPlanDesdePanelAdmin('free')" class="btn-ghost" style="width:auto;padding:10px 14px">Pasar a Free</button>
+          </div>
+        </div>` : `
+        <div style="background:#fff5f5;border:1px solid #f2c7c7;border-radius:12px;padding:12px;font-size:13px;color:#c0392b">Usuario no encontrado</div>`) : ''}
+    </div>` : ''}
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">COLORES DE LA APLICACIÓN</div>
       ${[{k:'primary',l:'Color principal'},{k:'accent',l:'Color acento'},{k:'bg',l:'Color de fondo'}].map(({k,l})=>`
@@ -2351,10 +2584,22 @@ function sendFirebaseVerificationEmail(user){
   if(!(firebaseEnabled && firebaseAuth && targetUser && typeof targetUser.getIdToken === 'function')){
     return Promise.reject(new Error('auth/no-current-user'));
   }
-  if(targetUser.emailVerified === true){
-    return Promise.reject(new Error('auth/already-verified'));
-  }
-  return targetUser.getIdToken(true)
+  console.log('sendEmailVerification:start', {
+    email: targetUser.email || '',
+    emailVerified: targetUser.emailVerified === true
+  });
+  return Promise.resolve(typeof targetUser.reload === 'function' ? targetUser.reload() : null)
+    .then(()=>{
+      const refreshedUser = firebaseAuth?.currentUser || targetUser;
+      console.log('sendEmailVerification:afterReload', {
+        email: refreshedUser.email || '',
+        emailVerified: refreshedUser.emailVerified === true
+      });
+      if(refreshedUser.emailVerified === true){
+        throw new Error('auth/already-verified');
+      }
+      return refreshedUser.getIdToken(true);
+    })
     .then(idToken=>fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -2370,7 +2615,14 @@ function sendFirebaseVerificationEmail(user){
         const message = data?.error?.message || 'verification-email-failed';
         throw new Error(message);
       }
+      console.log('sendEmailVerification:success', {
+        email: (firebaseAuth?.currentUser || targetUser)?.email || ''
+      });
       return true;
+    })
+    .catch(error=>{
+      console.error('sendEmailVerification:error', error);
+      throw error;
     });
 }
 function verificationEmailErrorMessage(error){
@@ -2378,8 +2630,10 @@ function verificationEmailErrorMessage(error){
   if(raw.includes('AUTH/ALREADY-VERIFIED')) return 'Tu email ya está verificado';
   if(raw.includes('AUTH/NO-CURRENT-USER')) return 'Iniciá sesión para reenviar';
   if(raw.includes('TOO_MANY_ATTEMPTS_TRY_LATER') || raw.includes('AUTH/TOO-MANY-REQUESTS')) return 'Esperá unos minutos antes de reenviar';
-  if(raw.includes('USER_DISABLED')) return 'No se pudo reenviar el email';
-  return 'No se pudo reenviar el email';
+  if(raw.includes('USER_TOKEN_EXPIRED') || raw.includes('TOKEN_EXPIRED')) return 'La sesión expiró. Volvé a iniciar sesión.';
+  if(raw.includes('NETWORK_REQUEST_FAILED')) return 'Error de conexión.';
+  if(raw.includes('USER_DISABLED')) return 'No se pudo enviar el email de verificación.';
+  return 'No se pudo enviar el email de verificación.';
 }
 
 function registrarUsuario(){
@@ -2496,21 +2750,20 @@ function recuperarContrasena(){
 function reenviarEmailVerificacion(){
   const user = firebaseAuth?.currentUser || null;
   if(!(firebaseEnabled && firebaseAuth && user)){
-    alert('Iniciá sesión para reenviar');
+    showToast('Iniciá sesión para reenviar');
     return;
   }
   if(user.emailVerified===true){
-    alert('Tu email ya está verificado');
+    showToast('Tu email ya está verificado');
     return;
   }
   sendFirebaseVerificationEmail(user)
     .then(()=>{
-      showToast('Se envió un correo para verificar la cuenta');
-      alert('Te enviamos un correo para verificar tu cuenta. Revisá tu email antes de continuar.');
+      showToast('Email de verificación enviado. Revisá spam o promociones.');
     })
     .catch((error)=>{
-      console.error(error);
-      alert(verificationEmailErrorMessage(error));
+      console.error('Error reenviando verificación:', error);
+      showToast(verificationEmailErrorMessage(error));
     });
 }
 
@@ -2537,15 +2790,15 @@ function firebaseAuthError(err){
 }
 
 function abrirSoporteEmail(){
-  if(!SUPPORT_EMAIL || SUPPORT_EMAIL==='TU_EMAIL'){
+  if(!SUPPORT_EMAIL){
     alert('Configurá el email de soporte en la app.');
     return;
   }
-  window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Soporte Preceptor Pro')}`;
+  window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Preceptor Pro - Consulta')}`;
 }
 
 function abrirSoporteWhatsApp(){
-  if(!SUPPORT_WHATSAPP || SUPPORT_WHATSAPP==='TU_NUMERO'){
+  if(!SUPPORT_WHATSAPP){
     alert('Configurá el número de WhatsApp de soporte en la app.');
     return;
   }
@@ -2553,8 +2806,8 @@ function abrirSoporteWhatsApp(){
 }
 
 function solicitarPremiumContacto(){
-  if(SUPPORT_WHATSAPP && SUPPORT_WHATSAPP!=='TU_NUMERO'){
-    const mensaje = encodeURIComponent('Hola! 👋\nQuiero pasarme a la versión Premium de Preceptor Pro.');
+  if(SUPPORT_WHATSAPP){
+    const mensaje = encodeURIComponent('Hola! Quiero pasarme a Premium en Preceptor Pro.');
     window.open(`https://wa.me/${SUPPORT_WHATSAPP}?text=${mensaje}`, '_blank');
     return;
   }
@@ -2567,6 +2820,17 @@ function resetProfilePhotoPreview(){
   }
   profilePhotoPreviewUrl = '';
   profilePhotoPreviewObjectUrl = '';
+}
+function isTemporaryProfilePhotoUrl(url){
+  const value = String(url||'').trim();
+  return value.startsWith('blob:') || value.startsWith('data:');
+}
+function withProfilePhotoCacheBuster(url, stamp){
+  const value = String(url||'').trim();
+  if(!value || isTemporaryProfilePhotoUrl(value)) return value;
+  const clean = value.replace(/([?&])t=\d+/g,'').replace(/[?&]$/,'');
+  const ts = stamp ? new Date(stamp).getTime() : Date.now();
+  return `${clean}${clean.includes('?') ? '&' : '?'}t=${ts}`;
 }
 function setProfilePhotoPreview(url, isObjectUrl=false){
   if(profilePhotoPreviewObjectUrl && profilePhotoPreviewObjectUrl!==url){
@@ -2586,22 +2850,6 @@ function readFileAsDataURL(file){
       reject(err);
     }
   });
-}
-async function saveProfilePhotoLocally(file, successMessage, errorMessage){
-  try{
-    const dataUrl = await readFileAsDataURL(file);
-    if(!dataUrl) throw new Error('empty-image-data');
-    state.perfil = {...(state.perfil||{}), foto:dataUrl};
-    resetProfilePhotoPreview();
-    save();
-    render();
-    if(successMessage) showToast(successMessage);
-    return true;
-  }catch(err){
-    console.error('Profile photo local save error', err);
-    if(errorMessage) showToast(errorMessage);
-    return false;
-  }
 }
 function seleccionarFotoPerfil(){
   const input = document.getElementById('profilePhotoInput');
@@ -2630,8 +2878,8 @@ function subirFotoPerfil(event){
   setProfilePhotoPreview(previewUrl, true);
   render();
   if(!(firebaseEnabled && storageEnabled && storageDb && activeUser?.uid)){
-    saveProfilePhotoLocally(file, 'Foto actualizada correctamente', 'Error al subir imagen')
-      .finally(done);
+    showToast('No se pudo sincronizar la foto. Iniciá sesión para subirla.');
+    done();
     return;
   }
 
@@ -2641,21 +2889,22 @@ function subirFotoPerfil(event){
     .then(()=>ref.getDownloadURL())
     .then(url=>{
       if(!url) throw new Error('no-url');
-      state.perfil = {...(state.perfil||{}), foto:url};
+      const stamp = new Date().toISOString();
+      state.perfil = {
+        ...(state.perfil||{}),
+        foto: withProfilePhotoCacheBuster(url, stamp),
+        fotoUpdatedAt: stamp
+      };
       resetProfilePhotoPreview();
       save();
       render();
       showToast('Foto actualizada correctamente');
     })
-    .catch(async err=>{
+    .catch(err=>{
       console.error('Profile photo upload error', err);
       setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
-      const savedLocally = await saveProfilePhotoLocally(file, '', '');
-      if(savedLocally){
-        showToast('Error al subir imagen. Se guardó solo en este dispositivo.');
-      }else{
-        showToast('Error al subir imagen');
-      }
+      render();
+      showToast('Error al subir imagen');
     })
     .finally(done);
 }
