@@ -105,6 +105,7 @@
   <!-- Rendered by JS -->
 </div>
 <input type="file" id="backupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackup(event)"/>
+<input type="file" id="emergencyBackupImportInput" accept="application/json,.json" style="display:none" onchange="importarBackupEmergencia(event)"/>
 <input type="file" id="profilePhotoInput" accept="image/*" style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none" onchange="subirFotoPerfil(event)"/>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.0.0/firebase-auth-compat.js"></script>
@@ -2360,6 +2361,17 @@ function buildConfig(){
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">EMERGENCIA / RECUPERACIÓN</div>
+      <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Herramientas manuales para salvar los datos actuales del dispositivo y volver a subirlos a la nube sin tocar el funcionamiento normal.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button onclick="exportarBackupEmergencia()" class="btn-primary" style="flex:1;min-width:180px">Exportar backup JSON</button>
+        <button onclick="seleccionarBackupEmergencia()" class="btn-ghost" style="flex:1;min-width:180px">Importar backup JSON</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="forzarSubirDatosActualesANube()" class="btn-ghost" style="width:100%">Forzar subir datos actuales a la nube</button>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">SESIÓN</div>
       <div style="font-size:14px;color:#333;font-weight:600;margin-bottom:4px">${esc(activeUser?.nombre||'')}</div>
       <div style="font-size:12px;color:#777;margin-bottom:12px">${esc(activeUser?.email||'')}</div>
@@ -3942,6 +3954,133 @@ function importarBackup(event){
     }
   };
   reader.readAsText(file);
+}
+function normalizeImportedAppState(data){
+  const source = data?.state && typeof data.state === 'object' ? data.state : data;
+  const next = {
+    ...state,
+    ...deepCopy(PERSIST_DEFAULTS),
+    ...(source && typeof source === 'object' ? source : {})
+  };
+  if(!next._listaCols) next._listaCols = ['','',''];
+  if(typeof next._listaModo === 'undefined') next._listaModo = 'curso';
+  if(!next._acapOpen) next._acapOpen = {};
+  if(!next._acapClipboard) next._acapClipboard = null;
+  if(typeof next._acapSearch === 'undefined') next._acapSearch = '';
+  if(typeof next._acapDesde === 'undefined') next._acapDesde = '';
+  if(typeof next._acapHasta === 'undefined') next._acapHasta = '';
+  if(typeof next._asistSearch === 'undefined') next._asistSearch = '';
+  if(typeof next._asistInitial === 'undefined') next._asistInitial = '';
+  if(typeof next._asistLimit === 'undefined') next._asistLimit = 40;
+  if(typeof next._asistOnlyAcap === 'undefined') next._asistOnlyAcap = false;
+  if(!next._asistSelected) next._asistSelected = {};
+  if(!next.asistObs) next.asistObs = {};
+  if(!next.horasInstitucion) next.horasInstitucion = HORAS;
+  if(typeof next.fastMode === 'undefined') next.fastMode = false;
+  if(typeof next._lastModified === 'undefined') next._lastModified = '';
+  if(!next.acapHistorial) next.acapHistorial = [];
+  if(typeof next._notasSearch === 'undefined') next._notasSearch = '';
+  if(typeof next._notasOnlyImportant === 'undefined') next._notasOnlyImportant = false;
+  if(!next.listasGlobales) next.listasGlobales = [];
+  if(typeof next._authMode === 'undefined') next._authMode = 'login';
+  if(!next.userProfile) next.userProfile = {nombre:activeUser?.nombre||'', email:activeUser?.email||'', uid:activeUser?.uid||''};
+  if(!next.plan) next.plan = 'free';
+  next.notas = (next.notas||[]).map(n=>({importante:false,fija:false,...n}));
+  if(typeof next.modal === 'undefined') next.modal = null;
+  if(typeof next.modalData === 'undefined') next.modalData = {};
+  return next;
+}
+function exportarBackupEmergencia(){
+  try{
+    const payload = getCurrentStatePayload();
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup_preceptor_pro_${todayISO()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }catch(err){
+    console.error('Emergency backup export error', err);
+    showToast('No se pudo exportar el backup');
+  }
+}
+function seleccionarBackupEmergencia(){
+  const input = document.getElementById('emergencyBackupImportInput');
+  if(!input) return;
+  input.value = '';
+  input.click();
+}
+async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la nube correctamente'){
+  if(!(firestoreEnabled && firestoreDb && activeUser?.uid)){
+    const code = 'firestore/not-available';
+    const message = 'No hay una sesión con Firestore disponible para sincronizar.';
+    console.error(code, message);
+    showToast(`${code}: ${message}`);
+    return false;
+  }
+  try{
+    const payload = getCurrentStatePayload();
+    const ref = getFirestoreDocRef('main');
+    const userRef = getUserDocRef(activeUser.uid);
+    await Promise.all([
+      ref.set({
+        state: payload,
+        meta: {
+          updatedAt: state._lastModified || new Date().toISOString(),
+          dataKeys: APP_DATA_KEYS
+        }
+      }, {merge:true}),
+      userRef.set({
+        plan: state.plan === 'premium' ? 'premium' : 'free',
+        email: activeUser?.email || '',
+        nombre: getVisibleUserName(),
+        perfil: buildSyncedProfilePayload(),
+        updatedAt: state._lastModified || new Date().toISOString()
+      }, {merge:true})
+    ]);
+    console.log('Datos guardados en Firestore', payload);
+    setCloudStatus('synced');
+    showToast(successMessage);
+    return true;
+  }catch(err){
+    console.error('Emergency Firestore sync error', err);
+    const code = err?.code || 'firestore/error';
+    const message = err?.message || 'Error desconocido al guardar en Firestore.';
+    showToast(`${code}: ${message}`);
+    return false;
+  }
+}
+function importarBackupEmergencia(event){
+  const file = event?.target?.files?.[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async e=>{
+    try{
+      const data = JSON.parse(e.target?.result || '{}');
+      if(!data || typeof data !== 'object') throw new Error('invalid');
+      state = normalizeImportedAppState(data);
+      state._lastModified = new Date().toISOString();
+      persistLocalState();
+      render();
+      const synced = await subirEstadoActualANubeEstricto('Backup restaurado correctamente');
+      if(!synced){
+        showToast('Backup restaurado localmente. Revisá el error de Firebase.');
+      }
+    }catch(err){
+      console.error('Emergency backup import error', err);
+      showToast('No se pudo restaurar el backup');
+    }finally{
+      event.target.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+async function forzarSubirDatosActualesANube(){
+  await subirEstadoActualANubeEstricto('Datos subidos a la nube correctamente');
 }
 
 let toastTimer = null;
