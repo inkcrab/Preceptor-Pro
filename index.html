@@ -218,6 +218,7 @@ let cloudStatusTimer = null;
 let remoteHydrating = false;
 let splashHidden = false;
 let splashMaxTimer = null;
+let lastRemoteUserDoc = null;
 let profilePhotoPreviewUrl = '';
 let profilePhotoPreviewObjectUrl = '';
 function scopedStorageKey(k){
@@ -523,6 +524,47 @@ function applyPersistedState(data){
     resetProfilePhotoPreview();
   }
 }
+function buildSyncedProfilePayload(){
+  const perfil = state.perfil || {};
+  return {
+    nombre: String(perfil.nombre || '').trim(),
+    escuela: String(perfil.escuela || '').trim(),
+    institucion: String(perfil.institucion || '').trim(),
+    turno: String(perfil.turno || '').trim(),
+    foto: isTemporaryProfilePhotoUrl(perfil.foto) ? '' : stripProfilePhotoCacheBuster(String(perfil.foto || '').trim()),
+    fotoUpdatedAt: perfil.fotoUpdatedAt || state._lastModified || new Date().toISOString()
+  };
+}
+function applyRemoteProfileFromUserDoc(data, options={}){
+  const remotePerfil = data?.perfil;
+  if(!remotePerfil || typeof remotePerfil !== 'object') return false;
+  let changed = false;
+  const nextPerfil = {...(state.perfil||{})};
+  ['nombre','escuela','institucion','turno'].forEach(key=>{
+    const value = String(remotePerfil[key] || '').trim();
+    if(value && value !== String(nextPerfil[key] || '').trim()){
+      nextPerfil[key] = value;
+      changed = true;
+    }
+  });
+  const remotePhoto = String(remotePerfil.foto || '').trim();
+  const remoteStamp = remotePerfil.fotoUpdatedAt || data?.updatedAt || new Date().toISOString();
+  if(remotePhoto && !isTemporaryProfilePhotoUrl(remotePhoto)){
+    const normalizedRemotePhoto = withProfilePhotoCacheBuster(remotePhoto, remoteStamp);
+    if(String(nextPerfil.foto || '').trim() !== normalizedRemotePhoto || String(nextPerfil.fotoUpdatedAt || '').trim() !== String(remoteStamp)){
+      nextPerfil.foto = normalizedRemotePhoto;
+      nextPerfil.fotoUpdatedAt = remoteStamp;
+      changed = true;
+    }
+  }
+  if(changed){
+    state.perfil = nextPerfil;
+    resetProfilePhotoPreview();
+    persistLocalState();
+    if(options.showToast) showToast('Foto sincronizada');
+  }
+  return changed;
+}
 function persistLocalState(){
   S.set('pp_perfil',state.perfil);
   S.set('pp_user_profile',state.userProfile);
@@ -593,6 +635,9 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
     const ref = getUserDocRef(uid);
     if(!ref) return false;
     const snap = await ref.get();
+    const userData = snap.exists ? (snap.data() || {}) : {};
+    lastRemoteUserDoc = userData;
+    applyRemoteProfileFromUserDoc(userData);
     if(isAdminEmail(activeUser?.email || snap.data()?.email || '')){
       state.plan = 'premium';
       S.set('pp_plan', state.plan);
@@ -601,6 +646,7 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           plan: 'premium',
           email: activeUser?.email || snap.data()?.email || '',
           nombre: getVisibleUserName() || '',
+          perfil: buildSyncedProfilePayload(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -618,6 +664,7 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           plan: 'free',
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
+          perfil: buildSyncedProfilePayload(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -645,6 +692,7 @@ async function loadDataFromFirestore(){
     if(!data) return planLoaded;
     remoteHydrating = true;
     applyPersistedState(data);
+    if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
     if(isAdminUser()) state.plan = 'premium';
     else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
     remoteHydrating = false;
@@ -679,6 +727,7 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
     plan: plan === 'premium' ? 'premium' : 'free',
     email: extra.email || '',
     nombre: extra.nombre || '',
+    perfil: extra.perfil || buildSyncedProfilePayload(),
     updatedAt: new Date().toISOString()
   }, {merge:true});
   return true;
@@ -702,7 +751,8 @@ async function saveToFirestore(){
       }, {merge:true}),
       userRef ? upsertRemoteUserPlan(activeUser?.uid, state.plan, {
         email: activeUser?.email || '',
-        nombre: getVisibleUserName()
+        nombre: getVisibleUserName(),
+        perfil: buildSyncedProfilePayload()
       }) : Promise.resolve()
     ]);
   }catch(err){
@@ -726,9 +776,14 @@ function hydrateFromFirestoreInBackground(){
     return;
   }
   setCloudStatus('syncing');
+  const localPhotoBefore = String(state?.perfil?.foto || '').trim();
+  const localPhotoStampBefore = String(state?.perfil?.fotoUpdatedAt || '').trim();
   loadDataFromFirestore()
     .then(loaded=>{
       if(loaded){
+        if(String(state?.perfil?.foto || '').trim() !== localPhotoBefore || String(state?.perfil?.fotoUpdatedAt || '').trim() !== localPhotoStampBefore){
+          showToast('Foto sincronizada');
+        }
         setCloudStatus('synced');
         render();
       } else {
@@ -2835,6 +2890,9 @@ function withProfilePhotoCacheBuster(url, stamp){
   const clean = value.replace(/([?&])t=\d+/g,'').replace(/[?&]$/,'');
   const ts = stamp ? new Date(stamp).getTime() : Date.now();
   return `${clean}${clean.includes('?') ? '&' : '?'}t=${ts}`;
+}
+function stripProfilePhotoCacheBuster(url){
+  return String(url||'').trim().replace(/([?&])t=\d+/g,'').replace(/[?&]$/,'');
 }
 function setProfilePhotoPreview(url, isObjectUrl=false){
   if(profilePhotoPreviewObjectUrl && profilePhotoPreviewObjectUrl!==url){
