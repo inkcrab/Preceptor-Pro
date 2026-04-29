@@ -761,6 +761,11 @@ async function loadDataFromFirestore(){
       return planLoaded;
     }
     remoteHydrating = true;
+    if (hasMeaningfulLocalState()) {
+      console.log("Usando datos locales como fuente principal");
+      await saveToFirestore();
+      return true;
+    }
     applyPersistedState(data);
     if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
     if(isAdminUser()) state.plan = 'premium';
