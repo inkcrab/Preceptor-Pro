@@ -221,20 +221,32 @@ let splashMaxTimer = null;
 let lastRemoteUserDoc = null;
 let profilePhotoPreviewUrl = '';
 let profilePhotoPreviewObjectUrl = '';
+function getActiveUserUid(){
+  return String(activeUser?.uid || activeUser?.id || firebaseAuth?.currentUser?.uid || '').trim();
+}
 function scopedStorageKey(k){
-  if(!activeUser || !APP_DATA_KEYS.includes(k)) return k;
-  return `pp_user_${activeUser.email}_${k}`;
+  if(!APP_DATA_KEYS.includes(k)) return k;
+  const uid = getActiveUserUid();
+  if(!uid) return null;
+  return `pp_state_${uid}_${k}`;
 }
-function hasScopedData(email){
-  return APP_DATA_KEYS.some(k=>localStorage.getItem(`pp_user_${email}_${k}`)!==null);
+function hasScopedData(userRef){
+  const uid = String(userRef?.uid || userRef?.id || userRef || '').trim();
+  if(!uid) return false;
+  return APP_DATA_KEYS.some(k=>localStorage.getItem(`pp_state_${uid}_${k}`)!==null);
 }
-function migrateLegacyDataToUser(email){
-  if(hasScopedData(email)) return;
+function migrateLegacyDataToUser(userRef){
+  const uid = String(userRef?.uid || userRef?.id || '').trim();
+  const email = String(userRef?.email || '').trim();
+  if(!uid || hasScopedData(uid)) return;
   APP_DATA_KEYS.forEach(k=>{
-    const legacy = localStorage.getItem(k);
-    if(legacy!==null){
-      localStorage.setItem(`pp_user_${email}_${k}`, legacy);
-    }
+    const candidates = [
+      localStorage.getItem(`pp_state_${uid}_${k}`),
+      email ? localStorage.getItem(`pp_user_${email}_${k}`) : null,
+      localStorage.getItem(k)
+    ];
+    const legacy = candidates.find(v=>v!==null);
+    if(legacy!==null) localStorage.setItem(`pp_state_${uid}_${k}`, legacy);
   });
 }
 function initFirebaseAuth(){
@@ -264,7 +276,7 @@ function syncActiveUserFromFirebase(user){
       nombre: user.displayName || user.email || 'Usuario',
       emailVerified: user.emailVerified === true
     };
-    migrateLegacyDataToUser(activeUser.email);
+    migrateLegacyDataToUser(activeUser);
     setActiveUser(activeUser, getAuthPersistencePreference()!=='session');
     state.userProfile = {
       ...(state.userProfile||{}),
@@ -353,8 +365,21 @@ function setCloudStatus(status){
 }
 
 const S = {
-  get:(k,d)=>{try{const v=localStorage.getItem(scopedStorageKey(k));return v?JSON.parse(v):d;}catch{return d;}},
-  set:(k,v)=>{try{localStorage.setItem(scopedStorageKey(k),JSON.stringify(v));}catch{}}
+  get:(k,d)=>{
+    try{
+      const scopedKey = scopedStorageKey(k);
+      if(!scopedKey) return d;
+      const v=localStorage.getItem(scopedKey);
+      return v?JSON.parse(v):d;
+    }catch{return d;}
+  },
+  set:(k,v)=>{
+    try{
+      const scopedKey = scopedStorageKey(k);
+      if(!scopedKey) return;
+      localStorage.setItem(scopedKey,JSON.stringify(v));
+    }catch{}
+  }
 };
 
 // ---- State ----
@@ -453,6 +478,47 @@ const PERSIST_DEFAULTS = {
   config: {fastMode: state.fastMode},
   _lastModified: state._lastModified,
 };
+function resetScopedState(options={}){
+  const keepAuthMode = options.keepAuthMode!==false;
+  const keepRemember = options.keepRemember!==false;
+  const rememberLogin = keepRemember ? state._rememberLogin : (getAuthPersistencePreference()!=='session');
+  const authMode = keepAuthMode ? (state._authMode || 'login') : 'login';
+  Object.keys(PERSIST_DEFAULTS).forEach(k=>{
+    state[k] = deepCopy(PERSIST_DEFAULTS[k]);
+  });
+  state.screen = 'home';
+  state.tab = 'cursos';
+  state.cursoActivo = null;
+  state.cursoTab = 'asistencia';
+  state.fechaAsist = toISO(new Date());
+  state.vistaAsist = 'dia';
+  state._listaActiva = null;
+  state._listaModo = 'curso';
+  state._listaCols = ['','',''];
+  state._acapOpen = {};
+  state._acapClipboard = null;
+  state._acapSearch = '';
+  state._acapDesde = '';
+  state._acapHasta = '';
+  state._asistSearch = '';
+  state._asistInitial = '';
+  state._asistLimit = 40;
+  state._asistSelected = {};
+  state._asistOnlyAcap = false;
+  state._notasSearch = '';
+  state._notasOnlyImportant = false;
+  state._authMode = authMode;
+  state._rememberLogin = rememberLogin;
+  state._cloudStatus = 'local';
+  state._toast = null;
+  state.modal = null;
+  state.modalData = {};
+  lastRemoteUserDoc = null;
+  remoteHydrating = false;
+  clearTimeout(remoteSaveTimer);
+  remoteSaveTimer = null;
+  resetProfilePhotoPreview();
+}
 function serializePersistedState(){
   return {
     perfil: state.perfil,
@@ -515,6 +581,7 @@ function applyPersistedState(data){
   }
   if(source.perfil && typeof source.perfil === 'object' && String(source.perfil.foto||'').trim() && !String(source.perfil.foto||'').trim().startsWith('blob:') && !String(source.perfil.foto||'').trim().startsWith('data:')){
     const stamp = source.perfil.fotoUpdatedAt || source._lastModified || data?.meta?.updatedAt || state._lastModified || new Date().toISOString();
+    console.log('Foto cargada desde Firestore:', source.perfil?.foto || '');
     state.perfil = {
       ...(state.perfil||{}),
       ...source.perfil,
@@ -535,6 +602,12 @@ function buildSyncedProfilePayload(){
     fotoUpdatedAt: perfil.fotoUpdatedAt || state._lastModified || new Date().toISOString()
   };
 }
+function getCurrentStatePayload(){
+  return serializePersistedState();
+}
+function hasMeaningfulLocalState(){
+  return hasMeaningfulPersistedData(getCurrentStatePayload());
+}
 function applyRemoteProfileFromUserDoc(data, options={}){
   const remotePerfil = data?.perfil;
   if(!remotePerfil || typeof remotePerfil !== 'object') return false;
@@ -551,6 +624,7 @@ function applyRemoteProfileFromUserDoc(data, options={}){
   const remoteStamp = remotePerfil.fotoUpdatedAt || data?.updatedAt || new Date().toISOString();
   if(remotePhoto && !isTemporaryProfilePhotoUrl(remotePhoto)){
     const normalizedRemotePhoto = withProfilePhotoCacheBuster(remotePhoto, remoteStamp);
+    console.log('Foto cargada desde Firestore:', remotePhoto);
     if(String(nextPerfil.foto || '').trim() !== normalizedRemotePhoto || String(nextPerfil.fotoUpdatedAt || '').trim() !== String(remoteStamp)){
       nextPerfil.foto = normalizedRemotePhoto;
       nextPerfil.fotoUpdatedAt = remoteStamp;
@@ -586,6 +660,10 @@ function persistLocalState(){
   S.set('pp_last_modified',state._lastModified);
 }
 function reloadScopedLocalState(){
+  if(!getActiveUserUid()){
+    resetScopedState();
+    return;
+  }
   state.perfil = S.get('pp_perfil', deepCopy(PERSIST_DEFAULTS.perfil));
   state.userProfile = S.get('pp_user_profile', deepCopy(PERSIST_DEFAULTS.userProfile));
   state.plan = S.get('pp_plan', PERSIST_DEFAULTS.plan);
@@ -622,13 +700,15 @@ function reloadScopedLocalState(){
   }
 }
 function getUserDocRef(uid=activeUser?.uid){
-  if(!firestoreEnabled || !uid) return null;
-  return firestoreDb.collection('users').doc(uid);
+  const safeUid = String(uid || firebaseAuth?.currentUser?.uid || '').trim();
+  if(!firestoreEnabled || !safeUid) return null;
+  return firestoreDb.collection('users').doc(safeUid);
 }
 function getFirestoreDocRef(mode){
-  if(!firestoreEnabled || !activeUser?.uid) return null;
-  if(mode==='legacy') return firestoreDb.collection('users').doc(activeUser.uid).collection('data').doc('appState');
-  return firestoreDb.collection('users').doc(activeUser.uid).collection('appData').doc('main');
+  const uid = getActiveUserUid();
+  if(!firestoreEnabled || !uid) return null;
+  if(mode==='legacy') return firestoreDb.collection('users').doc(uid).collection('data').doc('appState');
+  return firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
 }
 async function loadUserPlanFromFirestore(uid=activeUser?.uid){
   try{
@@ -679,8 +759,16 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
 }
 async function loadDataFromFirestore(){
   try{
-    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
+    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!authUid || authUid!==getActiveUserUid()){
+      console.warn('Skipping Firestore load: no authenticated uid available.');
+      return false;
+    }
+    const userRef = getUserDocRef(authUid);
+    const userSnap = userRef ? await userRef.get() : null;
+    const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
     let data = null;
+    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
     for(const ref of refs){
       const snap = await ref.get();
       if(snap.exists && hasMeaningfulPersistedData(snap.data())){
@@ -689,12 +777,18 @@ async function loadDataFromFirestore(){
       }
     }
     const planLoaded = await loadUserPlanFromFirestore();
-    if(!data) return planLoaded;
+    if(!data){
+      if(hasMeaningfulLocalState()){
+        await saveToFirestore();
+      }
+      return planLoaded;
+    }
     remoteHydrating = true;
     applyPersistedState(data);
     if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
     if(isAdminUser()) state.plan = 'premium';
     else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
+    console.log('Datos cargados desde Firestore', data.state && typeof data.state==='object' ? data.state : data);
     remoteHydrating = false;
     persistLocalState();
     return true;
@@ -735,26 +829,36 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
 async function saveToFirestore(){
   let nextStatus = 'synced';
   try{
+    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!authUid || authUid!==getActiveUserUid()){
+      nextStatus = 'local';
+      console.warn('Skipping Firestore save: no authenticated uid available.');
+      return;
+    }
     const ref = getFirestoreDocRef('main');
-    const userRef = getUserDocRef();
+    const userRef = getUserDocRef(authUid);
+    const payload = getCurrentStatePayload();
     if(!ref){
       nextStatus = 'local';
       return;
     }
     await Promise.all([
       ref.set({
-        state: serializePersistedState(),
+        state: payload,
         meta: {
           updatedAt: state._lastModified || new Date().toISOString(),
           dataKeys: APP_DATA_KEYS
         }
       }, {merge:true}),
-      userRef ? upsertRemoteUserPlan(activeUser?.uid, state.plan, {
+      userRef ? userRef.set({
+        plan: state.plan === 'premium' ? 'premium' : 'free',
         email: activeUser?.email || '',
         nombre: getVisibleUserName(),
-        perfil: buildSyncedProfilePayload()
-      }) : Promise.resolve()
+        perfil: buildSyncedProfilePayload(),
+        updatedAt: state._lastModified || new Date().toISOString()
+      }, {merge:true}) : Promise.resolve()
     ]);
+    console.log('Datos guardados en Firestore', payload);
   }catch(err){
     console.error('Firestore save error', err);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
@@ -2707,7 +2811,7 @@ function registrarUsuario(){
         return Promise.resolve(user?.updateProfile ? user.updateProfile({displayName:nombre}) : null).then(()=>user);
       })
       .then((user)=>{
-        migrateLegacyDataToUser(email);
+        migrateLegacyDataToUser({uid:user.uid, email});
         state.plan = 'free';
         S.set('pp_plan', state.plan);
         state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
@@ -2739,10 +2843,10 @@ function registrarUsuario(){
   }
   const nuevo = {id:uid(), nombre, email, password};
   try{ localStorage.setItem(AUTH_USERS_KEY, JSON.stringify([...users, nuevo])); }catch{}
-  if(!users.length) migrateLegacyDataToUser(email);
+  if(!users.length) migrateLegacyDataToUser({uid:nuevo.id, email});
   state.plan = 'free';
   S.set('pp_plan', state.plan);
-  setActiveUser({id:nuevo.id, nombre:nuevo.nombre, email:nuevo.email});
+  setActiveUser({uid:nuevo.id, id:nuevo.id, nombre:nuevo.nombre, email:nuevo.email});
   window.location.reload();
 }
 
@@ -2774,7 +2878,7 @@ function iniciarSesion(){
   }
   setAuthPersistencePreference(remember);
   state._rememberLogin = remember;
-  setActiveUser({id:user.id, nombre:user.nombre, email:user.email}, remember);
+  setActiveUser({uid:user.id, id:user.id, nombre:user.nombre, email:user.email}, remember);
   window.location.reload();
 }
 
@@ -2824,6 +2928,7 @@ function reenviarEmailVerificacion(){
 
 function cerrarSesion(){
   if(!confirm('¿Cerrar sesión?')) return;
+  resetScopedState();
   if(firebaseEnabled && firebaseAuth){
     firebaseAuth.signOut().catch(()=>{}).finally(()=>{
       clearActiveUser();
@@ -2989,11 +3094,13 @@ function subirFotoPerfil(event){
     .then(url=>{
       if(!url) throw new Error('no-url');
       const stamp = new Date().toISOString();
+      console.log('Foto subida Storage URL:', url);
       state.perfil = {
         ...(state.perfil||{}),
         foto: String(url||'').trim(),
         fotoUpdatedAt: stamp
       };
+      console.log('Foto guardada en perfil.foto:', state.perfil.foto);
       resetProfilePhotoPreview();
       save();
       render();
@@ -3905,12 +4012,26 @@ setInterval(()=>{
 if(initFirebaseAuth() && firebaseAuth){
   firebaseAuth.onAuthStateChanged(user=>{
     const finalizeAuth = (resolvedUser)=>{
+      resetScopedState();
       syncActiveUserFromFirebase(resolvedUser);
       if(resolvedUser){
         reloadScopedLocalState();
         authReady = true;
+        if(firestoreEnabled && (typeof navigator==='undefined' || navigator.onLine)){
+          setCloudStatus('syncing');
+          loadDataFromFirestore()
+            .then(()=>{
+              render();
+              setCloudStatus('synced');
+            })
+            .catch(err=>{
+              console.error('Initial Firestore load error', err);
+              setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
+              render();
+            });
+          return;
+        }
         render();
-        hydrateFromFirestoreInBackground();
         return;
       }
       setCloudStatus('local');
