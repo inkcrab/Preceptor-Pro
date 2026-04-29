@@ -2961,14 +2961,12 @@ function registrarUsuario(){
         S.set('pp_plan', state.plan);
         state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
         state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
-        const saveUserDoc = getUserDocRef(user.uid || firebaseAuth?.currentUser?.uid)?.set({
+        const saveUserDoc = ensureUserDirectoryDoc({
           uid: user.uid || firebaseAuth?.currentUser?.uid || '',
-          plan: 'free',
           email,
           nombre,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }, {merge:true});
+          displayName: nombre
+        });
         return Promise.resolve(saveUserDoc)
           .then(()=>sendFirebaseVerificationEmail(user));
       })
@@ -3009,6 +3007,10 @@ function iniciarSesion(){
     state._rememberLogin = remember;
     firebaseAuth.setPersistence(persistence)
       .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
+      .then((cred)=>{
+        return Promise.resolve(ensureUserDirectoryDoc(cred?.user))
+          .then(()=>cred);
+      })
       .then((cred)=>{
         updateLoginProgress('Cargando tus datos...');
         if(cred?.user && cred.user.emailVerified===false){
