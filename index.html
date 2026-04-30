@@ -619,6 +619,7 @@ function applyPersistedState(data){
   console.log('Cargando listasGlobales:', source.listasGlobales);
   if(typeof source.listas !== 'undefined') state.listas = source.listas || {};
   if(typeof source.listasGlobales !== 'undefined') state.listasGlobales = source.listasGlobales || [];
+  if(typeof source.agenda !== 'undefined' && typeof source.eventos === 'undefined') state.eventos = source.agenda || [];
   if(source.config && typeof source.config.fastMode !== 'undefined' && !isMeaningfulValue(source.fastMode, state.fastMode)){
     state.fastMode = source.config.fastMode;
   }
@@ -661,8 +662,40 @@ function buildSyncedProfilePayload(){
 function getCurrentStatePayload(){
   return serializePersistedState();
 }
+function getAppDataPayload(){
+  return {
+    cursos: state.cursos,
+    alumnos: state.alumnos,
+    asistencia: state.asistencia,
+    acaps: state.acaps,
+    listas: state.listas,
+    listasGlobales: state.listasGlobales,
+    perfil: state.perfil,
+    notas: state.notas,
+    agenda: state.eventos,
+    eventos: state.eventos,
+    horarios: state.horarios,
+    colors: state.colors,
+    plan: state.plan,
+    updatedAt: state._lastModified || new Date().toISOString()
+  };
+}
 function hasMeaningfulLocalState(){
   return hasMeaningfulPersistedData(getCurrentStatePayload());
+}
+function hasMeaningfulAppDataPayload(payload){
+  if(!payload || typeof payload!=='object') return false;
+  return !!(
+    (payload.cursos||[]).length ||
+    Object.keys(payload.alumnos||{}).length ||
+    Object.keys(payload.asistencia||{}).length ||
+    Object.keys(payload.acaps||{}).length ||
+    Object.keys(payload.listas||{}).length ||
+    (payload.listasGlobales||[]).length ||
+    (payload.notas||[]).length ||
+    (payload.agenda||[]).length ||
+    Object.keys(payload.horarios||{}).length
+  );
 }
 function hasMeaningfulListState(listas, listasGlobales){
   const hasListas = !!(listas && typeof listas === 'object' && Object.keys(listas).length);
@@ -855,54 +888,7 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
   }
 }
 async function loadDataFromFirestore(){
-  try{
-    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
-    if(!authUid || authUid!==getActiveUserUid()){
-      console.warn('Skipping Firestore load: no authenticated uid available.');
-      return false;
-    }
-    const userRef = getUserDocRef(authUid);
-    const userSnap = userRef ? await userRef.get() : null;
-    const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
-    let data = null;
-    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
-    for(const ref of refs){
-      const snap = await ref.get();
-      if(snap.exists && hasMeaningfulPersistedData(snap.data())){
-        data = snap.data();
-        break;
-      }
-    }
-    const planLoaded = await loadUserPlanFromFirestore();
-    if(!data){
-      if(hasMeaningfulLocalState()){
-        await saveToFirestore();
-      }
-      return planLoaded;
-    }
-    remoteHydrating = true;
-    const source = data.state && typeof data.state==='object' ? data.state : data;
-    const localHasLists = hasMeaningfulListState(state.listas, state.listasGlobales);
-    const remoteHasLists = hasMeaningfulListState(source?.listas, source?.listasGlobales);
-    if (hasMeaningfulLocalState() && localHasLists && !remoteHasLists) {
-      console.log("Usando datos locales como fuente principal");
-      await saveToFirestore();
-      return true;
-    }
-    applyPersistedState(data);
-    if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
-    if(isAdminUser()) state.plan = 'premium';
-    else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
-    console.log('Datos cargados desde Firestore', data.state && typeof data.state==='object' ? data.state : data);
-    remoteHydrating = false;
-    persistLocalState();
-    return true;
-  }catch(err){
-    console.error('Firestore load error', err);
-    return false;
-  }finally{
-    remoteHydrating = false;
-  }
+  return loadCloudData();
 }
 function queueFirestoreSave(){
   if(remoteHydrating) return;
@@ -935,7 +921,7 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
   }, {merge:true});
   return true;
 }
-async function saveToFirestore(){
+async function saveCloudData(){
   let nextStatus = 'synced';
   try{
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
@@ -946,21 +932,20 @@ async function saveToFirestore(){
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
-    const payload = getCurrentStatePayload();
+    const payload = getAppDataPayload();
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
+    console.log('Guardando appData/main', payload);
     if(!ref){
       nextStatus = 'local';
       return;
     }
+    if(!hasMeaningfulAppDataPayload(payload)){
+      nextStatus = 'local';
+      return false;
+    }
     await Promise.all([
-      ref.set({
-        state: payload,
-        meta: {
-          updatedAt: state._lastModified || new Date().toISOString(),
-          dataKeys: APP_DATA_KEYS
-        }
-      }, {merge:true}),
+      ref.set(payload, {merge:true}),
       userRef ? userRef.set({
         uid: authUid,
         plan: state.plan === 'premium' ? 'premium' : 'free',
@@ -972,11 +957,57 @@ async function saveToFirestore(){
       }, {merge:true}) : Promise.resolve()
     ]);
     console.log('Datos guardados en Firestore', payload);
+    return true;
   }catch(err){
-    console.error('Firestore save error', err);
+    console.error('Error saveCloudData', err);
+    showToast(`${err?.code || 'firestore/error'}: ${err?.message || 'No se pudo guardar en la nube'}`);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
+    return false;
   }finally{
     setCloudStatus(nextStatus);
+  }
+}
+async function saveToFirestore(){
+  return saveCloudData();
+}
+async function loadCloudData(){
+  try{
+    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!authUid || authUid!==getActiveUserUid()){
+      console.warn('Skipping Firestore load: no authenticated uid available.');
+      return false;
+    }
+    const planLoaded = await loadUserPlanFromFirestore();
+    const ref = getFirestoreDocRef('main');
+    if(!ref) return planLoaded;
+    const snap = await ref.get();
+    if(!snap.exists){
+      showToast('Sin datos en nube todavía');
+      return planLoaded;
+    }
+    const data = snap.data() || {};
+    console.log('Cargando appData/main', data);
+    remoteHydrating = true;
+    const source = data.state && typeof data.state==='object' ? data.state : data;
+    const localHasLists = hasMeaningfulListState(state.listas, state.listasGlobales);
+    const remoteHasLists = hasMeaningfulListState(source?.listas, source?.listasGlobales);
+    if(hasMeaningfulLocalState() && localHasLists && !remoteHasLists){
+      console.log("Usando datos locales como fuente principal");
+      await saveCloudData();
+      return true;
+    }
+    applyPersistedState(data);
+    if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
+    if(isAdminUser()) state.plan = 'premium';
+    else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
+    persistLocalState();
+    return true;
+  }catch(error){
+    console.error('Error loadCloudData', error);
+    showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo cargar desde la nube'}`);
+    return false;
+  }finally{
+    remoteHydrating = false;
   }
 }
 function hydrateFromFirestoreInBackground(){
