@@ -669,7 +669,7 @@ function getAppDataPayload(){
     asistencia: state.asistencia,
     acaps: state.acaps,
     listas: state.listas,
-    listasGlobales: state.listasGlobales,
+    listasGlobales: state.listasGlobales || [],
     perfil: state.perfil,
     notas: state.notas,
     agenda: state.eventos,
@@ -935,6 +935,7 @@ async function saveCloudData(){
     const payload = getAppDataPayload();
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
+    console.log('Guardando appData/main con listasGlobales:', payload.listasGlobales);
     console.log('Guardando appData/main', payload);
     if(!ref){
       nextStatus = 'local';
