@@ -670,7 +670,7 @@ function getAppDataPayload(){
     alumnos: state.alumnos,
     asistencia: state.asistencia,
     acaps: state.acaps,
-    listas: state.listas,
+    listas: state.listas || {},
     listasGlobales: state.listasGlobales || [],
     perfil: state.perfil,
     notas: state.notas,
@@ -961,8 +961,8 @@ async function saveCloudData(){
     const cleanPayload = cleanForFirestore(payload);
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
-    console.log('Payload appData/main:', payload);
-    console.log('Payload limpio para Firestore:', cleanPayload);
+    console.log('Payload original appData/main:', payload);
+    console.log('Payload limpio appData/main:', cleanPayload);
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando appData/main con listasGlobales:', cleanPayload?.listasGlobales);
