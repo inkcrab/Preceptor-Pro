@@ -922,27 +922,29 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
   return true;
 }
 async function saveCloudData(){
-  let nextStatus = 'synced';
+  let nextStatus = 'local';
   try{
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
-      nextStatus = 'local';
       console.warn('Skipping Firestore save: no authenticated uid available.');
-      return;
+      return false;
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
     const payload = getAppDataPayload();
+    console.log('UID actual:', authUid);
+    console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
+    console.log('Payload appData/main:', payload);
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando appData/main con listasGlobales:', payload.listasGlobales);
     console.log('Guardando appData/main', payload);
     if(!ref){
-      nextStatus = 'local';
-      return;
+      showToast('No se pudo verificar el guardado en la nube');
+      console.error('No se pudo verificar el guardado en la nube');
+      return false;
     }
     if(!hasMeaningfulAppDataPayload(payload)){
-      nextStatus = 'local';
       return false;
     }
     await Promise.all([
@@ -957,10 +959,18 @@ async function saveCloudData(){
         updatedAt: state._lastModified || new Date().toISOString()
       }, {merge:true}) : Promise.resolve()
     ]);
+    const verifySnap = await ref.get();
+    if(!verifySnap.exists){
+      showToast('No se pudo verificar el guardado en la nube');
+      console.error('No se pudo verificar el guardado en la nube');
+      nextStatus = 'local';
+      return false;
+    }
+    nextStatus = 'synced';
     console.log('Datos guardados en Firestore', payload);
     return true;
   }catch(err){
-    console.error('Error saveCloudData', err);
+    console.error('Error real guardando appData/main:', err);
     showToast(`${err?.code || 'firestore/error'}: ${err?.message || 'No se pudo guardar en la nube'}`);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
     return false;
@@ -2609,6 +2619,9 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="forzarSubirDatosActualesANube()" class="btn-ghost" style="width:100%">Forzar subir datos actuales a la nube</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="testCloudSave()" class="btn-ghost" style="width:100%">Probar guardado nube</button>
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
@@ -4331,6 +4344,41 @@ function importarBackupEmergencia(event){
 }
 async function forzarSubirDatosActualesANube(){
   await subirEstadoActualANubeEstricto('Datos subidos a la nube correctamente');
+}
+async function testCloudSave(){
+  try{
+    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!authUid || authUid!==getActiveUserUid()){
+      showToast('firestore/no-current-user: No hay usuario activo para probar la nube');
+      return false;
+    }
+    const ref = getFirestoreDocRef('main');
+    if(!ref){
+      showToast('firestore/invalid-ref: No se pudo obtener appData/main');
+      return false;
+    }
+    const payload = {
+      debugTest: true,
+      debugAt: new Date().toISOString(),
+      listasGlobales: state.listasGlobales || []
+    };
+    console.log('UID actual:', authUid);
+    console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
+    console.log('Payload appData/main:', payload);
+    await ref.set(payload, {merge:true});
+    const verifySnap = await ref.get();
+    if(verifySnap.exists){
+      showToast('Prueba guardada en appData/main');
+      return true;
+    }
+    console.error('No se pudo verificar el guardado en la nube');
+    showToast('No se pudo verificar el guardado en la nube');
+    return false;
+  }catch(error){
+    console.error('Error real guardando appData/main:', error);
+    showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo guardar en la nube'}`);
+    return false;
+  }
 }
 
 let toastTimer = null;
