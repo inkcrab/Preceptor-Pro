@@ -661,6 +661,19 @@ function buildSyncedProfilePayload(){
     fotoUpdatedAt: perfil.fotoUpdatedAt || state._lastModified || new Date().toISOString()
   };
 }
+function getCleanPerfilForFirestore(){
+  const perfil = state.perfil || {};
+  const cleanPerfil = {
+    nombre: typeof perfil?.nombre === 'string' ? perfil.nombre : '',
+    escuela: typeof perfil?.escuela === 'string' ? perfil.escuela : '',
+    institucion: typeof perfil?.institucion === 'string' ? perfil.institucion : '',
+    turno: typeof perfil?.turno === 'string' ? perfil.turno : '',
+    foto: typeof perfil?.foto === 'string' ? perfil.foto : '',
+    fotoUpdatedAt: (typeof perfil?.fotoUpdatedAt === 'string' || typeof perfil?.fotoUpdatedAt === 'number') ? perfil.fotoUpdatedAt : ''
+  };
+  console.log('Perfil limpio para Firestore:', cleanPerfil);
+  return cleanPerfil;
+}
 function getCurrentStatePayload(){
   return serializePersistedState();
 }
@@ -672,7 +685,7 @@ function getAppDataPayload(){
     acaps: state.acaps,
     listas: state.listas || {},
     listasGlobales: state.listasGlobales || [],
-    perfil: state.perfil,
+    perfil: getCleanPerfilForFirestore(),
     notas: state.notas,
     agenda: state.eventos,
     eventos: state.eventos,
@@ -988,7 +1001,7 @@ async function saveCloudData(){
         plan: state.plan === 'premium' ? 'premium' : 'free',
         email: String(activeUser?.email || '').trim().toLowerCase(),
         nombre: getVisibleUserName(),
-        perfil: buildSyncedProfilePayload(),
+        perfil: getCleanPerfilForFirestore(),
         createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
         updatedAt: state._lastModified || new Date().toISOString()
       }, {merge:true}) : Promise.resolve()
