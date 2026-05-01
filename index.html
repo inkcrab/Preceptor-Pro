@@ -414,7 +414,8 @@ let state = {
   vistaAsist: 'dia',
   _listaActiva: null,
   _listaModo: 'curso',
-  _listaCols: ['','',''],
+  _listaNombreDraft: '',
+  _listaCols: [''],
   _acapOpen: {},
   _acapClipboard: null,
   _acapSearch: '',
@@ -514,7 +515,8 @@ function resetScopedState(options={}){
   state.vistaAsist = 'dia';
   state._listaActiva = null;
   state._listaModo = 'curso';
-  state._listaCols = ['','',''];
+  state._listaNombreDraft = '';
+  state._listaCols = [''];
   state._acapOpen = {};
   state._acapClipboard = null;
   state._acapSearch = '';
@@ -3076,13 +3078,14 @@ function buildModalCurso(d){
 }
 
 function buildModalLista(d){
-  const cols = state._listaCols||['','',''];
+  const cols = (state._listaCols && state._listaCols.length ? state._listaCols : ['']);
+  const nombre = state._listaNombreDraft || '';
   const modo = d?.modo==='global' ? 'global' : 'curso';
   return `
-    <div style="margin-bottom:12px"><label>NOMBRE DE LA LISTA *</label><input class="inp" id="lista_nombre" placeholder="Ej: Salida al museo"/></div>
+    <div style="margin-bottom:12px"><label>NOMBRE DE LA LISTA *</label><input class="inp" id="lista_nombre" value="${esc(nombre)}" oninput="setListaNombreDraft(this.value)" placeholder="Ej: Salida al museo"/></div>
     <div style="margin-bottom:12px"><label>TIPO</label><div style="font-size:13px;color:${modo==='global'?'#e67e22':'#555'};font-weight:700">${modo==='global'?'Lista global':'Lista por curso'}</div></div>
     <div style="margin-bottom:12px"><label>COLUMNAS (una por check)</label>
-      <div id="listaCols">${cols.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px"><input class="inp lista-col" placeholder="Ej: Autorización" value="${esc(c)}"/>${cols.length>1?`<button onclick="removeCol(${i})" style="background:none;border:none;color:#e74c3c;padding:4px">${ICONS.x}</button>`:''}</div>`).join('')}</div>
+      <div id="listaCols">${cols.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px"><input class="inp lista-col" placeholder="${i===0?'Columna 1 o Ej: Autorización':`Columna ${i+1}`}" value="${esc(c)}" oninput="setListaColDraft(${i}, this.value)"/>${cols.length>1?`<button type="button" onclick="removeCol(${i})" style="background:none;border:none;color:#e74c3c;padding:4px">${ICONS.x}</button>`:''}</div>`).join('')}</div>
       <button onclick="addCol()" style="background:#f0f0f0;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:#555">+ Agregar columna</button>
     </div>
     ${modo==='global' ? `
@@ -3324,12 +3327,21 @@ function setNotasOrden(v){ state._notasOrden=v; render(); }
 function setNotasSearch(v){ state._notasSearch=v; render(); }
 function toggleNotasImportantes(){ state._notasOnlyImportant=!state._notasOnlyImportant; render(); }
 function setListaActiva(i){ state._listaActiva = (i===null||i===undefined) ? null : i; render(); }
+function setListaNombreDraft(v){ state._listaNombreDraft = String(v||''); }
+function setListaColDraft(i, v){
+  const cols = [...(state._listaCols && state._listaCols.length ? state._listaCols : [''])];
+  cols[i] = String(v||'');
+  state._listaCols = cols;
+}
 function setAuthMode(mode){ state._authMode = mode==='register' ? 'register' : 'login'; render(); }
 function setRememberLogin(checked){ state._rememberLogin = !!checked; }
 
 // Modals
 function openModal(type, extra){
-  state._listaCols=['','',''];
+  if(type==='lista'){
+    state._listaNombreDraft = '';
+    state._listaCols = [''];
+  }
   if(type==='curso' && !canCreateMoreCourses()){
     alert('Tu plan gratuito permite 1 curso. Pasá a Premium para crear más cursos.');
     return;
@@ -4219,9 +4231,9 @@ function importarLista(cursoId){
 
 // Listas
 function guardarLista(modo){
-  const nombre = document.getElementById('lista_nombre')?.value?.trim();
+  const nombre = String(state._listaNombreDraft || document.getElementById('lista_nombre')?.value || '').trim();
   if(!nombre) return;
-  const cols = [...document.querySelectorAll('.lista-col')].map(i=>i.value.trim()).filter(Boolean);
+  const cols = (state._listaCols||[]).map(v=>String(v||'').trim()).filter(Boolean);
   if(!cols.length) return;
   if(modo==='global'){
     if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
@@ -4240,6 +4252,8 @@ function guardarLista(modo){
     state.listas[cursoId]=[...(state.listas[cursoId]||[]),{nombre,columnas:cols,checks:{}}];
   }
   state._listaActiva = null;
+  state._listaNombreDraft = '';
+  state._listaCols = [''];
   save(); closeModal();
 }
 function borrarLista(i){
@@ -4270,10 +4284,12 @@ function toggleCheck(cursoId,listaIdx,key){
   save(); render();
 }
 function addCol(){
-  state._listaCols=[...(state._listaCols||['','']),'']; render();
+  state._listaCols=[...((state._listaCols && state._listaCols.length) ? state._listaCols : ['']),'']; render();
 }
 function removeCol(i){
-  state._listaCols=(state._listaCols||[]).filter((_,j)=>j!==i); render();
+  const next = (state._listaCols||[]).filter((_,j)=>j!==i);
+  state._listaCols = next.length ? next : [''];
+  render();
 }
 
 // Eventos
@@ -4515,7 +4531,7 @@ function importarBackup(event){
       const data = JSON.parse(e.target?.result || '{}');
       if(!data || typeof data !== 'object') throw new Error('invalid');
       state = data;
-	      if(!state._listaCols) state._listaCols = ['','',''];
+	      if(!state._listaCols || !state._listaCols.length) state._listaCols = [''];
 	      if(typeof state._listaModo === 'undefined') state._listaModo = 'curso';
 	      if(!state._acapOpen) state._acapOpen = {};
       if(!state._acapClipboard) state._acapClipboard = null;
@@ -4558,7 +4574,7 @@ function normalizeImportedAppState(data){
     ...deepCopy(PERSIST_DEFAULTS),
     ...(source && typeof source === 'object' ? source : {})
   };
-  if(!next._listaCols) next._listaCols = ['','',''];
+  if(!next._listaCols || !next._listaCols.length) next._listaCols = [''];
   if(typeof next._listaModo === 'undefined') next._listaModo = 'curso';
   if(!next._acapOpen) next._acapOpen = {};
   if(!next._acapClipboard) next._acapClipboard = null;
