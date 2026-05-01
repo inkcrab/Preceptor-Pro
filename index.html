@@ -661,7 +661,7 @@ function buildSyncedProfilePayload(){
     fotoUpdatedAt: perfil.fotoUpdatedAt || state._lastModified || new Date().toISOString()
   };
 }
-function getCleanPerfilForFirestore(){
+function getSafeProfileForFirestore(){
   const perfil = state.perfil || {};
   const cleanPerfil = {
     nombre: typeof perfil?.nombre === 'string' ? perfil.nombre : '',
@@ -669,10 +669,13 @@ function getCleanPerfilForFirestore(){
     institucion: typeof perfil?.institucion === 'string' ? perfil.institucion : '',
     turno: typeof perfil?.turno === 'string' ? perfil.turno : '',
     foto: typeof perfil?.foto === 'string' ? perfil.foto : '',
-    fotoUpdatedAt: (typeof perfil?.fotoUpdatedAt === 'string' || typeof perfil?.fotoUpdatedAt === 'number') ? perfil.fotoUpdatedAt : ''
+    fotoUpdatedAt: typeof perfil?.fotoUpdatedAt === 'string' ? perfil.fotoUpdatedAt : ''
   };
   console.log('Perfil limpio para Firestore:', cleanPerfil);
   return cleanPerfil;
+}
+function getCleanPerfilForFirestore(){
+  return getSafeProfileForFirestore();
 }
 function getCurrentStatePayload(){
   return serializePersistedState();
@@ -685,7 +688,6 @@ function getAppDataPayload(){
     acaps: state.acaps,
     listas: state.listas || {},
     listasGlobales: state.listasGlobales || [],
-    perfil: getCleanPerfilForFirestore(),
     notas: state.notas,
     agenda: state.eventos,
     eventos: state.eventos,
@@ -1059,16 +1061,18 @@ async function saveCloudData(){
       plan: state.plan === 'premium' ? 'premium' : 'free',
       email: String(activeUser?.email || '').trim().toLowerCase(),
       nombre: getVisibleUserName(),
-      perfil: getCleanPerfilForFirestore(),
+      perfil: getSafeProfileForFirestore(),
       createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
       updatedAt: state._lastModified || new Date().toISOString()
     });
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
+    console.log('Perfil seguro Firestore:', getSafeProfileForFirestore());
     console.log('Payload original appData/main:', payload);
     console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio appData/main:', cleanPayload);
     console.log('Payload limpio final:', cleanPayload);
+    console.log('Payload appData/main sin perfil:', payload);
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando en Firestore appData/main');
