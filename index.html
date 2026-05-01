@@ -964,7 +964,6 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           plan: 'premium',
           email: activeUser?.email || snap.data()?.email || '',
           nombre: getVisibleUserName() || '',
-          perfil: getSafeProfileForFirestore(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -984,7 +983,6 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
           createdAt: snap.data()?.createdAt || new Date().toISOString(),
-          perfil: getSafeProfileForFirestore(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -1069,15 +1067,19 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!userRef) return false;
   const currentSnap = await userRef.get();
   const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
-  await userRef.set({
+  const userDoc = {
     uid,
     plan: plan === 'premium' ? 'premium' : 'free',
     email: String(extra.email || current.email || '').trim().toLowerCase(),
     nombre: extra.nombre || current.nombre || '',
     createdAt: current.createdAt || new Date().toISOString(),
-    perfil: getSafeProfileForFirestore(),
     updatedAt: new Date().toISOString()
-  }, {merge:true});
+  };
+  if(userDoc && userDoc.perfil){
+    console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
+    delete userDoc.perfil;
+  }
+  await userRef.set(userDoc, {merge:true});
   return true;
 }
 async function saveCloudData(){
@@ -1103,13 +1105,15 @@ async function saveCloudData(){
       plan: state.plan === 'premium' ? 'premium' : 'free',
       email: String(activeUser?.email || '').trim().toLowerCase(),
       nombre: getVisibleUserName(),
-      perfil: getSafeProfileForFirestore(),
       createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
       updatedAt: state._lastModified || new Date().toISOString()
     });
+    if(cleanUserDoc && cleanUserDoc.perfil){
+      console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
+      delete cleanUserDoc.perfil;
+    }
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
-    console.log('Perfil seguro Firestore:', getSafeProfileForFirestore());
     console.log('Payload original appData/main:', payload);
     console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio appData/main:', cleanPayload);
@@ -4501,15 +4505,19 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(activeUser.uid);
+    const userDoc = sanitizeForFirestore({
+      plan: state.plan === 'premium' ? 'premium' : 'free',
+      email: activeUser?.email || '',
+      nombre: getVisibleUserName(),
+      updatedAt: state._lastModified || new Date().toISOString()
+    });
+    if(userDoc && userDoc.perfil){
+      console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
+      delete userDoc.perfil;
+    }
     await Promise.all([
       ref.set(sanitizeForFirestore(payload), {merge:true}),
-      userRef.set({
-        plan: state.plan === 'premium' ? 'premium' : 'free',
-        email: activeUser?.email || '',
-        nombre: getVisibleUserName(),
-        perfil: getSafeProfileForFirestore(),
-        updatedAt: state._lastModified || new Date().toISOString()
-      }, {merge:true})
+      userRef.set(userDoc, {merge:true})
     ]);
     console.log('Datos guardados en Firestore', payload);
     setCloudStatus('synced');
