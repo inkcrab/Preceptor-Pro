@@ -997,18 +997,31 @@ async function loadDataFromFirestore(){
   return loadCloudData();
 }
 function queueFirestoreSave(){
-  if(remoteHydrating) return;
+  console.log('queueFirestoreSave ejecutado');
+  if(remoteHydrating){
+    console.warn('queueFirestoreSave cancelado: remoteHydrating activo');
+    return;
+  }
   if(!activeUser?.uid || !firestoreEnabled){
+    console.warn('queueFirestoreSave cancelado: sin usuario activo o Firebase deshabilitado', {
+      activeUid: activeUser?.uid || '',
+      authUid: firebaseAuth?.currentUser?.uid || '',
+      firestoreEnabled
+    });
     setCloudStatus('local');
     return;
   }
   if(typeof navigator!=='undefined' && !navigator.onLine){
+    console.warn('queueFirestoreSave cancelado: sin conexión');
     setCloudStatus('offline');
     return;
   }
   clearTimeout(remoteSaveTimer);
   setCloudStatus('syncing');
-  remoteSaveTimer = setTimeout(()=>{ saveToFirestore(); }, 500);
+  remoteSaveTimer = setTimeout(()=>{
+    console.log('queueFirestoreSave -> saveToFirestore');
+    saveToFirestore();
+  }, 500);
 }
 async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!firestoreEnabled || !uid) return false;
@@ -1058,6 +1071,7 @@ async function saveCloudData(){
     console.log('Payload limpio final:', cleanPayload);
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
+    console.log('Guardando en Firestore appData/main');
     console.log('Guardando appData/main con listasGlobales:', cleanPayload?.listasGlobales);
     console.log('Guardando appData/main', cleanPayload);
     if(!ref){
@@ -1111,6 +1125,7 @@ async function saveCloudData(){
   }
 }
 async function saveToFirestore(){
+  console.log('saveToFirestore ejecutado');
   return saveCloudData();
 }
 async function loadCloudData(){
@@ -1188,6 +1203,7 @@ function hydrateFromFirestoreInBackground(){
 }
 
 function save(){
+  console.log('SAVE ejecutado');
   state._lastModified = new Date().toISOString();
   persistLocalState();
   try{
