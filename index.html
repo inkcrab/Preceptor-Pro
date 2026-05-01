@@ -2498,6 +2498,7 @@ function buildListas(c){
         <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${totalChecks} / ${totalPosibles} marcados</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="event.stopPropagation();duplicarLista(${i})" style="background:none;border:none;color:var(--accent);padding:6px">${ICONS.copy || '⧉'}</button>
         <button onclick="event.stopPropagation();borrarLista(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
         <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
@@ -2515,6 +2516,7 @@ function buildListas(c){
         <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${(l.miembros||[]).length} alumnos · ${totalChecks} / ${totalPosibles} marcados</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button onclick="event.stopPropagation();duplicarListaGlobal(${i})" style="background:none;border:none;color:var(--accent);padding:6px">${ICONS.copy || '⧉'}</button>
         <button onclick="event.stopPropagation();borrarListaGlobal(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
         <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
@@ -4262,10 +4264,39 @@ function borrarLista(i){
   state.listas[cursoId]=(state.listas[cursoId]||[]).filter((_,j)=>j!==i);
   save(); render();
 }
+function duplicarLista(i){
+  const cursoId = state.cursoActivo;
+  const original = (state.listas[cursoId]||[])[i];
+  if(!original) return;
+  const copia = {
+    nombre: `${original.nombre || 'Lista'} (copia)`,
+    columnas: [...(original.columnas||[])],
+    checks: {}
+  };
+  state.listas[cursoId] = [...(state.listas[cursoId]||[]), copia];
+  save();
+  render();
+  showToastSafe('Lista duplicada correctamente');
+}
 function borrarListaGlobal(i){
   if(!confirm('¿Borrar lista global?')) return;
   state.listasGlobales=(state.listasGlobales||[]).filter((_,j)=>j!==i);
   save(); render();
+}
+function duplicarListaGlobal(i){
+  const original = (state.listasGlobales||[])[i];
+  if(!original) return;
+  const copia = {
+    id: uid(),
+    nombre: `${original.nombre || 'Lista'} (copia)`,
+    columnas: [...(original.columnas||[])],
+    checks: {},
+    miembros: [...(original.miembros||[])].map(m=>({...m}))
+  };
+  state.listasGlobales = [...(state.listasGlobales||[]), copia];
+  save();
+  render();
+  showToastSafe('Lista duplicada correctamente');
 }
 function toggleCheck(cursoId,listaIdx,key){
   if(cursoId==='global'){
