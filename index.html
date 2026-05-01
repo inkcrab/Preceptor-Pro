@@ -962,7 +962,7 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           plan: 'premium',
           email: activeUser?.email || snap.data()?.email || '',
           nombre: getVisibleUserName() || '',
-          perfil: buildSyncedProfilePayload(),
+          perfil: getSafeProfileForFirestore(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -982,7 +982,7 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
           createdAt: snap.data()?.createdAt || new Date().toISOString(),
-          perfil: buildSyncedProfilePayload(),
+          perfil: getSafeProfileForFirestore(),
           updatedAt: new Date().toISOString()
         }, {merge:true});
       }catch(writeErr){
@@ -1037,7 +1037,7 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
     email: String(extra.email || current.email || '').trim().toLowerCase(),
     nombre: extra.nombre || current.nombre || '',
     createdAt: current.createdAt || new Date().toISOString(),
-    perfil: extra.perfil || buildSyncedProfilePayload(),
+    perfil: getSafeProfileForFirestore(),
     updatedAt: new Date().toISOString()
   }, {merge:true});
   return true;
@@ -1054,6 +1054,10 @@ async function saveCloudData(){
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
     const payload = getAppDataPayload();
+    if(payload.perfil){
+      console.error('ERROR: appData/main todavía contiene perfil', payload.perfil);
+      delete payload.perfil;
+    }
     const invalidPaths = findInvalidFirestoreValues(payload);
     const cleanPayload = sanitizeForFirestore(payload);
     const cleanUserDoc = sanitizeForFirestore({
@@ -1073,6 +1077,7 @@ async function saveCloudData(){
     console.log('Payload limpio appData/main:', cleanPayload);
     console.log('Payload limpio final:', cleanPayload);
     console.log('Payload appData/main sin perfil:', payload);
+    console.log('Payload final appData/main keys:', Object.keys(payload));
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando en Firestore appData/main');
@@ -4448,22 +4453,20 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
     return false;
   }
   try{
-    const payload = getCurrentStatePayload();
+    const payload = getAppDataPayload();
+    if(payload.perfil){
+      console.error('ERROR: appData/main todavía contiene perfil', payload.perfil);
+      delete payload.perfil;
+    }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(activeUser.uid);
     await Promise.all([
-      ref.set({
-        state: payload,
-        meta: {
-          updatedAt: state._lastModified || new Date().toISOString(),
-          dataKeys: APP_DATA_KEYS
-        }
-      }, {merge:true}),
+      ref.set(sanitizeForFirestore(payload), {merge:true}),
       userRef.set({
         plan: state.plan === 'premium' ? 'premium' : 'free',
         email: activeUser?.email || '',
         nombre: getVisibleUserName(),
-        perfil: buildSyncedProfilePayload(),
+        perfil: getSafeProfileForFirestore(),
         updatedAt: state._lastModified || new Date().toISOString()
       }, {merge:true})
     ]);
