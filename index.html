@@ -150,6 +150,7 @@ const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
 const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
 const supportWhatsapp = '549XXXXXXXXXX';
 const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
+const APP_VERSION = 'debug-firestore-perfil-fix-01';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = ['omar_moyano@hotmail.com'];
 const AUTH_USERS_KEY = 'pp_auth_users';
@@ -758,6 +759,56 @@ function sanitizeForFirestore(value){
 function cleanForFirestore(value){
   return sanitizeForFirestore(value);
 }
+function removePerfilDeep(value){
+  if(value === undefined) return undefined;
+  if(value === null) return null;
+  if(value instanceof Date) return value.toISOString();
+  if(typeof File !== 'undefined' && value instanceof File) return undefined;
+  if(typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
+  if(typeof Event !== 'undefined' && value instanceof Event) return undefined;
+  if(typeof Node !== 'undefined' && value instanceof Node) return undefined;
+  const t = typeof value;
+  if(t === 'string' || t === 'boolean') return value;
+  if(t === 'number') return Number.isFinite(value) ? value : null;
+  if(t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
+  if(Array.isArray(value)){
+    return value.map(item=>removePerfilDeep(item)).filter(item=>typeof item !== 'undefined');
+  }
+  if(isPlainObject(value)){
+    const out = {};
+    Object.keys(value).forEach(key=>{
+      if(key === 'perfil') return;
+      const cleaned = removePerfilDeep(value[key]);
+      if(typeof cleaned !== 'undefined') out[key] = cleaned;
+    });
+    return out;
+  }
+  if(t === 'object'){
+    try{
+      return removePerfilDeep(JSON.parse(JSON.stringify(value)));
+    }catch(_err){
+      return undefined;
+    }
+  }
+  return undefined;
+}
+function findPerfilPaths(value, path=''){
+  const matches = [];
+  const visit = (current, currentPath)=>{
+    if(!current || typeof current !== 'object') return;
+    if(Array.isArray(current)){
+      current.forEach((item, index)=>visit(item, currentPath ? `${currentPath}.${index}` : String(index)));
+      return;
+    }
+    Object.keys(current).forEach(key=>{
+      const nextPath = currentPath ? `${currentPath}.${key}` : key;
+      if(key === 'perfil') matches.push(nextPath);
+      visit(current[key], nextPath);
+    });
+  };
+  visit(value, path);
+  return matches;
+}
 function findInvalidFirestoreValues(obj, path=''){
   const invalid = [];
   const visit = (value, currentPath)=>{
@@ -806,6 +857,36 @@ function findInvalidFirestoreValues(obj, path=''){
   };
   visit(obj, path);
   return invalid;
+}
+async function safeFirestoreSet(ref, data, options = {}, label = 'unknown'){
+  console.log('Firestore write label:', label);
+  console.warn('Rutas perfil detectadas antes de limpiar:', findPerfilPaths(data));
+  const cleaned = removePerfilDeep(data);
+  console.warn('Rutas perfil después de limpiar:', findPerfilPaths(cleaned));
+  console.log('Payload final Firestore:', cleaned);
+  const remainingPerfil = findPerfilPaths(cleaned);
+  if(remainingPerfil.length){
+    const err = new Error('Bloqueado guardado: todavía existe perfil en ' + remainingPerfil.join(', '));
+    setLastCloudError({
+      code: 'firestore/perfil-blocked',
+      message: err.message,
+      stack: err.stack || ''
+    });
+    render();
+    throw err;
+  }
+  try{
+    return await ref.set(cleaned, options);
+  }catch(error){
+    console.error('Error real guardando en Firestore:', error);
+    setLastCloudError({
+      code: error?.code || '',
+      message: error?.message || String(error),
+      stack: error?.stack || ''
+    });
+    render();
+    throw error;
+  }
 }
 function hasMeaningfulListState(listas, listasGlobales){
   const hasListas = !!(listas && typeof listas === 'object' && Object.keys(listas).length);
@@ -926,19 +1007,19 @@ async function ensureUserDocument(user){
     const snap = await ref.get();
     const now = new Date().toISOString();
     if(!snap.exists){
-      await ref.set({
+      await safeFirestoreSet(ref, {
         uid,
         email,
         plan: isAdminEmail(email) ? 'premium' : 'free',
         createdAt: now,
         updatedAt: now
-      }, {merge:true});
+      }, {merge:true}, 'ensureUserDocument:new');
     } else {
-      await ref.set({
+      await safeFirestoreSet(ref, {
         uid,
         email,
         updatedAt: now
-      }, {merge:true});
+      }, {merge:true}, 'ensureUserDocument:update');
     }
     console.log('User document ensured', email);
     return true;
@@ -960,12 +1041,12 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
       state.plan = 'premium';
       S.set('pp_plan', state.plan);
       try{
-        await ref.set({
+        await safeFirestoreSet(ref, {
           plan: 'premium',
           email: activeUser?.email || snap.data()?.email || '',
           nombre: getVisibleUserName() || '',
           updatedAt: new Date().toISOString()
-        }, {merge:true});
+        }, {merge:true}, 'loadUserPlanFromFirestore:admin');
       }catch(writeErr){
         console.warn('Could not persist admin premium plan to Firestore.', writeErr);
       }
@@ -977,14 +1058,14 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
     if(remotePlan!=='premium' && remotePlan!=='free'){
       console.warn('Firestore plan missing or invalid. Defaulting to free.', {uid});
       try{
-        await ref.set({
+        await safeFirestoreSet(ref, {
           uid,
           plan: 'free',
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
           createdAt: snap.data()?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString()
-        }, {merge:true});
+        }, {merge:true}, 'loadUserPlanFromFirestore:default-free');
       }catch(writeErr){
         console.warn('Could not persist default free plan to Firestore.', writeErr);
       }
@@ -1079,7 +1160,7 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
     console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
     delete userDoc.perfil;
   }
-  await userRef.set(userDoc, {merge:true});
+  await safeFirestoreSet(userRef, userDoc, {merge:true}, 'upsertRemoteUserPlan');
   return true;
 }
 async function saveCloudData(){
@@ -1093,13 +1174,13 @@ async function saveCloudData(){
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
-    const payload = getAppDataPayload();
-    if(payload.perfil){
-      console.error('ERROR: appData/main todavía contiene perfil', payload.perfil);
-      delete payload.perfil;
+    const rawPayload = getAppDataPayload();
+    if(rawPayload.perfil){
+      console.error('ERROR: appData/main todavía contiene perfil', rawPayload.perfil);
+      delete rawPayload.perfil;
     }
-    const invalidPaths = findInvalidFirestoreValues(payload);
-    const cleanPayload = sanitizeForFirestore(payload);
+    const invalidPaths = findInvalidFirestoreValues(rawPayload);
+    const cleanPayload = sanitizeForFirestore(rawPayload);
     const cleanUserDoc = sanitizeForFirestore({
       uid: authUid,
       plan: state.plan === 'premium' ? 'premium' : 'free',
@@ -1114,12 +1195,12 @@ async function saveCloudData(){
     }
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
-    console.log('Payload original appData/main:', payload);
+    console.log('Payload original appData/main:', rawPayload);
     console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio appData/main:', cleanPayload);
     console.log('Payload limpio final:', cleanPayload);
-    console.log('Payload appData/main sin perfil:', payload);
-    console.log('Payload final appData/main keys:', Object.keys(payload));
+    console.log('Payload appData/main sin perfil:', rawPayload);
+    console.log('Payload final appData/main keys:', Object.keys(rawPayload));
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando en Firestore appData/main');
@@ -1139,8 +1220,8 @@ async function saveCloudData(){
       return false;
     }
     await Promise.all([
-      ref.set(cleanPayload, {merge:true}),
-      userRef ? userRef.set(cleanUserDoc, {merge:true}) : Promise.resolve()
+      safeFirestoreSet(ref, rawPayload, {merge:true}, 'users/{uid}/appData/main'),
+      userRef ? safeFirestoreSet(userRef, cleanUserDoc, {merge:true}, 'users/{uid}') : Promise.resolve()
     ]);
     const verifySnap = await ref.get();
     if(!verifySnap.exists){
@@ -1604,10 +1685,10 @@ async function actualizarPlanDesdePanelAdmin(plan){
     console.log('Activando premium para UID:', uid);
     const ref = getUserDocRef(uid);
     if(!ref) throw {code:'firestore/invalid-user-ref', message:'No se pudo obtener la referencia del usuario.'};
-    await ref.set({
+    await safeFirestoreSet(ref, {
       plan: normalizedPlan,
       updatedAt: new Date().toISOString()
-    }, {merge:true});
+    }, {merge:true}, 'admin:update-plan');
     const snap = await ref.get();
     const data = snap.exists ? (snap.data() || {}) : {};
     console.log('Plan actualizado:', data);
@@ -2811,6 +2892,7 @@ function buildConfig(){
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">EMERGENCIA / RECUPERACIÓN</div>
+      <div style="font-size:11px;color:#999;font-weight:700;margin-bottom:10px">Versión: ${esc(APP_VERSION)}</div>
       <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Herramientas manuales para salvar los datos actuales del dispositivo y volver a subirlos a la nube sin tocar el funcionamiento normal.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button onclick="exportarBackupEmergencia()" class="btn-primary" style="flex:1;min-width:180px">Exportar backup JSON</button>
@@ -2821,6 +2903,9 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="testCloudSave()" class="btn-ghost" style="width:100%">Probar guardado nube</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="testNoPerfilFirestoreSave()" class="btn-ghost" style="width:100%">Probar guardado sin perfil</button>
       </div>
       ${cloudLastError ? `
         <div style="margin-top:12px;background:#fff5f5;border:1px solid #f2c7c7;border-radius:12px;padding:12px">
@@ -4498,17 +4583,19 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
     return false;
   }
   try{
-    const payload = getAppDataPayload();
-    if(payload.perfil){
-      console.error('ERROR: appData/main todavía contiene perfil', payload.perfil);
-      delete payload.perfil;
+    const rawPayload = getAppDataPayload();
+    if(rawPayload.perfil){
+      console.error('ERROR: appData/main todavía contiene perfil', rawPayload.perfil);
+      delete rawPayload.perfil;
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(activeUser.uid);
     const userDoc = sanitizeForFirestore({
+      uid: activeUser.uid,
       plan: state.plan === 'premium' ? 'premium' : 'free',
       email: activeUser?.email || '',
       nombre: getVisibleUserName(),
+      createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
       updatedAt: state._lastModified || new Date().toISOString()
     });
     if(userDoc && userDoc.perfil){
@@ -4516,10 +4603,10 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
       delete userDoc.perfil;
     }
     await Promise.all([
-      ref.set(sanitizeForFirestore(payload), {merge:true}),
-      userRef.set(userDoc, {merge:true})
+      safeFirestoreSet(ref, rawPayload, {merge:true}, 'emergencia:appData/main'),
+      safeFirestoreSet(userRef, userDoc, {merge:true}, 'emergencia:users/{uid}')
     ]);
-    console.log('Datos guardados en Firestore', payload);
+    console.log('Datos guardados en Firestore', rawPayload);
     setCloudStatus('synced');
     showToast(successMessage);
     return true;
@@ -4596,7 +4683,7 @@ async function testCloudSave(){
     console.log('Payload appData/main:', payload);
     console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio para Firestore:', cleanPayload);
-    await ref.set(cleanPayload, {merge:true});
+    await safeFirestoreSet(ref, payload, {merge:true}, 'testCloudSave');
     const verifySnap = await ref.get();
     if(verifySnap.exists){
       showToast('Prueba guardada en appData/main');
@@ -4621,6 +4708,39 @@ async function testCloudSave(){
       field: error?.fieldPath || error?.customData?.fieldPath || ''
     };
     showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo guardar en la nube'}`);
+    render();
+    return false;
+  }
+}
+async function testNoPerfilFirestoreSave(){
+  try{
+    clearLastCloudError();
+    const uid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!uid) throw {code:'firestore/no-current-user', message:'No hay usuario activo para probar la nube'};
+    const ref = firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
+    const testPayload = {
+      debugTestNoPerfil: true,
+      debugAt: new Date().toISOString(),
+      perfil: { esto: 'debe eliminarse' },
+      nested: {
+        perfil: { tambien: 'debe eliminarse' }
+      },
+      listasGlobales: state.listasGlobales || []
+    };
+    await safeFirestoreSet(ref, testPayload, {merge:true}, 'test-no-perfil');
+    const verifySnap = await ref.get();
+    if(verifySnap.exists){
+      showToast('Prueba guardada sin perfil');
+      return true;
+    }
+    throw {code:'firestore/not-verified', message:'No se pudo verificar test-no-perfil'};
+  }catch(error){
+    console.error('Error testNoPerfilFirestoreSave:', error);
+    setLastCloudError({
+      code: error?.code || '',
+      message: error?.message || String(error),
+      stack: error?.stack || ''
+    });
     render();
     return false;
   }
