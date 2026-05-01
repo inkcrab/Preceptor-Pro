@@ -678,7 +678,7 @@ function getCurrentStatePayload(){
   return serializePersistedState();
 }
 function getAppDataPayload(){
-  return {
+  const payload = {
     cursos: state.cursos,
     alumnos: state.alumnos,
     asistencia: state.asistencia,
@@ -694,6 +694,7 @@ function getAppDataPayload(){
     plan: state.plan,
     updatedAt: state._lastModified || new Date().toISOString()
   };
+  return sanitizeForFirestore(payload);
 }
 function hasMeaningfulLocalState(){
   return hasMeaningfulPersistedData(getCurrentStatePayload());
@@ -712,28 +713,95 @@ function hasMeaningfulAppDataPayload(payload){
     Object.keys(payload.horarios||{}).length
   );
 }
-function cleanForFirestore(value){
+function isPlainObject(obj){
+  return Object.prototype.toString.call(obj) === '[object Object]';
+}
+function sanitizeForFirestore(value){
   if(value === undefined) return undefined;
   if(value === null) return null;
+  if(value instanceof Date) return value.toISOString();
+  if(typeof File !== 'undefined' && value instanceof File) return undefined;
+  if(typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
+  if(typeof Event !== 'undefined' && value instanceof Event) return undefined;
+  if(typeof Node !== 'undefined' && value instanceof Node) return undefined;
   const t = typeof value;
-  if(t === 'string' || t === 'number' || t === 'boolean') return value;
+  if(t === 'string' || t === 'boolean') return value;
+  if(t === 'number') return Number.isFinite(value) ? value : null;
+  if(t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
   if(Array.isArray(value)){
     return value
-      .map(item=>cleanForFirestore(item))
+      .map(item=>sanitizeForFirestore(item))
       .filter(item=>typeof item !== 'undefined');
   }
-  if(t === 'object'){
-    if(value instanceof Date) return value.toISOString();
-    const tag = Object.prototype.toString.call(value);
-    if(tag !== '[object Object]') return undefined;
+  if(isPlainObject(value)){
     const out = {};
     Object.keys(value).forEach(key=>{
-      const cleaned = cleanForFirestore(value[key]);
+      const cleaned = sanitizeForFirestore(value[key]);
       if(typeof cleaned !== 'undefined') out[key] = cleaned;
     });
     return out;
   }
+  if(t === 'object'){
+    try{
+      const plain = JSON.parse(JSON.stringify(value));
+      return sanitizeForFirestore(plain);
+    }catch(_err){
+      return undefined;
+    }
+  }
   return undefined;
+}
+function cleanForFirestore(value){
+  return sanitizeForFirestore(value);
+}
+function findInvalidFirestoreValues(obj, path=''){
+  const invalid = [];
+  const visit = (value, currentPath)=>{
+    if(value === undefined){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(value === null) return;
+    if(value instanceof Date) return;
+    if(typeof File !== 'undefined' && value instanceof File){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(typeof Blob !== 'undefined' && value instanceof Blob){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(typeof Event !== 'undefined' && value instanceof Event){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(typeof Node !== 'undefined' && value instanceof Node){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    const t = typeof value;
+    if(t === 'function' || t === 'symbol' || t === 'bigint'){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(t === 'number' && !Number.isFinite(value)){
+      invalid.push(currentPath || '(root)');
+      return;
+    }
+    if(Array.isArray(value)){
+      value.forEach((item, index)=>visit(item, currentPath ? `${currentPath}.${index}` : String(index)));
+      return;
+    }
+    if(isPlainObject(value)){
+      Object.keys(value).forEach(key=>visit(value[key], currentPath ? `${currentPath}.${key}` : key));
+      return;
+    }
+    if(t === 'object'){
+      invalid.push(currentPath || '(root)');
+    }
+  };
+  visit(obj, path);
+  return invalid;
 }
 function hasMeaningfulListState(listas, listasGlobales){
   const hasListas = !!(listas && typeof listas === 'object' && Object.keys(listas).length);
@@ -971,11 +1039,23 @@ async function saveCloudData(){
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
     const payload = getAppDataPayload();
-    const cleanPayload = cleanForFirestore(payload);
+    const invalidPaths = findInvalidFirestoreValues(payload);
+    const cleanPayload = sanitizeForFirestore(payload);
+    const cleanUserDoc = sanitizeForFirestore({
+      uid: authUid,
+      plan: state.plan === 'premium' ? 'premium' : 'free',
+      email: String(activeUser?.email || '').trim().toLowerCase(),
+      nombre: getVisibleUserName(),
+      perfil: getCleanPerfilForFirestore(),
+      createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
+      updatedAt: state._lastModified || new Date().toISOString()
+    });
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
     console.log('Payload original appData/main:', payload);
+    console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio appData/main:', cleanPayload);
+    console.log('Payload limpio final:', cleanPayload);
     console.log('Guardando listas:', state.listas);
     console.log('Guardando listasGlobales:', state.listasGlobales);
     console.log('Guardando appData/main con listasGlobales:', cleanPayload?.listasGlobales);
@@ -996,15 +1076,7 @@ async function saveCloudData(){
     }
     await Promise.all([
       ref.set(cleanPayload, {merge:true}),
-      userRef ? userRef.set({
-        uid: authUid,
-        plan: state.plan === 'premium' ? 'premium' : 'free',
-        email: String(activeUser?.email || '').trim().toLowerCase(),
-        nombre: getVisibleUserName(),
-        perfil: getCleanPerfilForFirestore(),
-        createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
-        updatedAt: state._lastModified || new Date().toISOString()
-      }, {merge:true}) : Promise.resolve()
+      userRef ? userRef.set(cleanUserDoc, {merge:true}) : Promise.resolve()
     ]);
     const verifySnap = await ref.get();
     if(!verifySnap.exists){
@@ -1027,7 +1099,8 @@ async function saveCloudData(){
     state._cloudLastError = {
       code: err?.code || 'firestore/error',
       message: err?.message || 'No se pudo guardar en la nube',
-      stack: err?.stack || ''
+      stack: err?.stack || '',
+      field: err?.fieldPath || err?.customData?.fieldPath || ''
     };
     showToast(`${err?.code || 'firestore/error'}: ${err?.message || 'No se pudo guardar en la nube'}`);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
@@ -2688,6 +2761,7 @@ function buildConfig(){
           <div style="font-weight:700;font-size:13px;color:#c0392b;margin-bottom:8px">Último error nube:</div>
           <div style="font-size:12px;color:#7a2e2e;line-height:1.5;white-space:pre-wrap;word-break:break-word"><strong>Código:</strong> ${esc(cloudLastError.code||'')}
 <strong>Mensaje:</strong> ${esc(cloudLastError.message||'')}
+${cloudLastError.field ? `<strong>Campo:</strong> ${esc(cloudLastError.field)}` : ''}
 ${cloudLastError.stack ? `<strong>Stack:</strong> ${esc(cloudLastError.stack)}` : ''}</div>
         </div>
       ` : ``}
@@ -4441,12 +4515,14 @@ async function testCloudSave(){
     const payload = {
       debugTest: true,
       debugAt: new Date().toISOString(),
-      listasGlobales: cleanForFirestore(state.listasGlobales || [])
+      listasGlobales: sanitizeForFirestore(state.listasGlobales || [])
     };
-    const cleanPayload = cleanForFirestore(payload);
+    const invalidPaths = findInvalidFirestoreValues(payload);
+    const cleanPayload = sanitizeForFirestore(payload);
     console.log('UID actual:', authUid);
     console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
     console.log('Payload appData/main:', payload);
+    console.warn('Valores inválidos Firestore:', invalidPaths);
     console.log('Payload limpio para Firestore:', cleanPayload);
     await ref.set(cleanPayload, {merge:true});
     const verifySnap = await ref.get();
@@ -4469,7 +4545,8 @@ async function testCloudSave(){
     state._cloudLastError = {
       code: error?.code || 'firestore/error',
       message: error?.message || 'No se pudo guardar en la nube',
-      stack: error?.stack || ''
+      stack: error?.stack || '',
+      field: error?.fieldPath || error?.customData?.fieldPath || ''
     };
     showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo guardar en la nube'}`);
     render();
