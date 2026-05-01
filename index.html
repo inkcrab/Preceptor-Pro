@@ -150,7 +150,7 @@ const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
 const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
 const supportWhatsapp = '549XXXXXXXXXX';
 const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
-const APP_VERSION = 'debug-firestore-perfil-fix-01';
+const APP_VERSION = 'perfil-repair-02';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = ['omar_moyano@hotmail.com'];
 const AUTH_USERS_KEY = 'pp_auth_users';
@@ -445,6 +445,37 @@ let state = {
   modal: null,
   modalData: {},
 };
+function getSafePerfilObject(input){
+  const p = input || {};
+  return {
+    nombre: typeof p?.nombre === 'string' ? p.nombre : '',
+    escuela: typeof p?.escuela === 'string' ? p.escuela : '',
+    institucion: typeof p?.institucion === 'string' ? p.institucion : '',
+    turno: typeof p?.turno === 'string' ? p.turno : '',
+    foto: typeof p?.foto === 'string' ? p.foto : '',
+    fotoUpdatedAt: typeof p?.fotoUpdatedAt === 'string' ? p.fotoUpdatedAt : ''
+  };
+}
+function showToastSafe(msg){
+  if(typeof showToast === 'function') showToast(msg);
+  else alert(msg);
+}
+function repairPerfilBeforeCloudSave(){
+  state.perfil = getSafePerfilObject(state.perfil);
+}
+function repairPerfilLocal(){
+  const safePerfil = getSafePerfilObject(state.perfil);
+  state.perfil = safePerfil;
+  try{
+    S.set('pp_perfil', safePerfil);
+    localStorage.setItem('pp_perfil', JSON.stringify(safePerfil));
+  }catch(e){
+    console.error('Error reparando pp_perfil:', e);
+  }
+  showToastSafe('Perfil reparado. Probá guardar nuevamente.');
+  render();
+}
+state.perfil = getSafePerfilObject(state.perfil);
 
 const PERSIST_DEFAULTS = {
   perfil: deepCopy(state.perfil),
@@ -969,6 +1000,7 @@ function reloadScopedLocalState(){
   state.colors = S.get('pp_colors', deepCopy(PERSIST_DEFAULTS.colors));
   state.fastMode = S.get('pp_fast_mode', PERSIST_DEFAULTS.fastMode);
   state._lastModified = S.get('pp_last_modified', PERSIST_DEFAULTS._lastModified);
+  state.perfil = getSafePerfilObject(state.perfil);
   state.userProfile = {
     ...(state.userProfile||{}),
     uid: state.userProfile?.uid || activeUser?.uid || '',
@@ -1167,6 +1199,7 @@ async function saveCloudData(){
   let nextStatus = 'local';
   try{
     clearLastCloudError();
+    repairPerfilBeforeCloudSave();
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
       console.warn('Skipping Firestore save: no authenticated uid available.');
@@ -2906,6 +2939,9 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="testNoPerfilFirestoreSave()" class="btn-ghost" style="width:100%">Probar guardado sin perfil</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="repairPerfilLocal()" class="btn-ghost" style="width:100%">Reparar perfil local</button>
       </div>
       ${cloudLastError ? `
         <div style="margin-top:12px;background:#fff5f5;border:1px solid #f2c7c7;border-radius:12px;padding:12px">
