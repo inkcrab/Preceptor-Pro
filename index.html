@@ -435,6 +435,7 @@ let state = {
   _loginError: '',
   _loginContinueDismissed: false,
   _cloudStatus: 'local',
+  _lastCloudError: null,
   _cloudLastError: null,
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
@@ -503,6 +504,7 @@ function resetScopedState(options={}){
   state._loginError = '';
   state._loginContinueDismissed = false;
   state._cloudStatus = 'local';
+  state._lastCloudError = null;
   state._cloudLastError = null;
   state._toast = null;
   state.modal = null;
@@ -1025,6 +1027,42 @@ function queueFirestoreSave(){
     saveToFirestore();
   }, 500);
 }
+function setLastCloudError(error){
+  const details = {
+    code: error?.code || '',
+    message: error?.message || String(error || ''),
+    stack: error?.stack || '',
+    time: new Date().toISOString()
+  };
+  state._lastCloudError = details;
+  state._cloudLastError = details;
+  return details;
+}
+function clearLastCloudError(){
+  state._lastCloudError = null;
+  state._cloudLastError = null;
+}
+async function copiarUltimoErrorNube(){
+  const error = state._lastCloudError || state._cloudLastError;
+  if(!error){
+    showToast('No hay error para copiar');
+    return;
+  }
+  const text = [
+    'Último error nube',
+    `Hora: ${error.time || ''}`,
+    `Code: ${error.code || ''}`,
+    `Message: ${error.message || ''}`,
+    `Stack: ${error.stack || ''}`
+  ].join('\n');
+  try{
+    await navigator.clipboard.writeText(text);
+    showToast('Error copiado');
+  }catch(err){
+    console.error('Clipboard error', err);
+    alert(text);
+  }
+}
 async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!firestoreEnabled || !uid) return false;
   const userRef = getUserDocRef(uid);
@@ -1045,7 +1083,7 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
 async function saveCloudData(){
   let nextStatus = 'local';
   try{
-    state._cloudLastError = null;
+    clearLastCloudError();
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
       console.warn('Skipping Firestore save: no authenticated uid available.');
@@ -1084,12 +1122,11 @@ async function saveCloudData(){
     console.log('Guardando appData/main con listasGlobales:', cleanPayload?.listasGlobales);
     console.log('Guardando appData/main', cleanPayload);
     if(!ref){
-      state._cloudLastError = {
+      setLastCloudError({
         code: 'firestore/invalid-ref',
         message: 'No se pudo obtener la referencia appData/main',
         stack: ''
-      };
-      showToast('No se pudo verificar el guardado en la nube');
+      });
       console.error('No se pudo verificar el guardado en la nube');
       render();
       return false;
@@ -1103,12 +1140,11 @@ async function saveCloudData(){
     ]);
     const verifySnap = await ref.get();
     if(!verifySnap.exists){
-      state._cloudLastError = {
+      setLastCloudError({
         code: 'firestore/not-verified',
         message: 'No se pudo verificar el guardado en la nube',
         stack: ''
-      };
-      showToast('No se pudo verificar el guardado en la nube');
+      });
       console.error('No se pudo verificar el guardado en la nube');
       nextStatus = 'local';
       render();
@@ -1119,13 +1155,14 @@ async function saveCloudData(){
     return true;
   }catch(err){
     console.error('Error real guardando appData/main:', err);
-    state._cloudLastError = {
+    const details = setLastCloudError({
       code: err?.code || 'firestore/error',
       message: err?.message || 'No se pudo guardar en la nube',
-      stack: err?.stack || '',
-      field: err?.fieldPath || err?.customData?.fieldPath || ''
-    };
-    showToast(`${err?.code || 'firestore/error'}: ${err?.message || 'No se pudo guardar en la nube'}`);
+      stack: err?.stack || ''
+    });
+    if(err?.fieldPath || err?.customData?.fieldPath){
+      details.field = err?.fieldPath || err?.customData?.fieldPath || '';
+    }
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
     render();
     return false;
@@ -2689,7 +2726,7 @@ function buildConfig(){
   const cols = state.colors;
   const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
   const adminLookup = state._adminLookupResult || null;
-  const cloudLastError = state._cloudLastError || null;
+  const cloudLastError = state._lastCloudError || state._cloudLastError || null;
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -2784,10 +2821,14 @@ function buildConfig(){
       ${cloudLastError ? `
         <div style="margin-top:12px;background:#fff5f5;border:1px solid #f2c7c7;border-radius:12px;padding:12px">
           <div style="font-weight:700;font-size:13px;color:#c0392b;margin-bottom:8px">Último error nube:</div>
-          <div style="font-size:12px;color:#7a2e2e;line-height:1.5;white-space:pre-wrap;word-break:break-word"><strong>Código:</strong> ${esc(cloudLastError.code||'')}
+          <div style="font-size:12px;color:#7a2e2e;line-height:1.5;white-space:pre-wrap;word-break:break-word"><strong>Hora:</strong> ${esc(cloudLastError.time||'')}
+<strong>Code:</strong> ${esc(cloudLastError.code||'')}
 <strong>Mensaje:</strong> ${esc(cloudLastError.message||'')}
 ${cloudLastError.field ? `<strong>Campo:</strong> ${esc(cloudLastError.field)}` : ''}
 ${cloudLastError.stack ? `<strong>Stack:</strong> ${esc(cloudLastError.stack)}` : ''}</div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end">
+            <button onclick="copiarUltimoErrorNube()" class="btn-ghost" style="width:auto;padding:8px 12px">Copiar error</button>
+          </div>
         </div>
       ` : ``}
     </div>
