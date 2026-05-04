@@ -150,7 +150,6 @@ const PERFIL_NAME_PLACEHOLDERS = ['preceptor','preceptor/a'];
 const SUPPORT_EMAIL = 'soporte.tusapps@gmail.com';
 const supportWhatsapp = '549XXXXXXXXXX';
 const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
-const APP_VERSION = 'perfil-repair-02';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = ['omar_moyano@hotmail.com'];
 const AUTH_USERS_KEY = 'pp_auth_users';
@@ -221,8 +220,6 @@ let splashMaxTimer = null;
 let lastRemoteUserDoc = null;
 let profilePhotoPreviewUrl = '';
 let profilePhotoPreviewObjectUrl = '';
-let loginSlowTimer = null;
-let loginContinueTimer = null;
 function getActiveUserUid(){
   return String(activeUser?.uid || activeUser?.id || firebaseAuth?.currentUser?.uid || '').trim();
 }
@@ -414,8 +411,7 @@ let state = {
   vistaAsist: 'dia',
   _listaActiva: null,
   _listaModo: 'curso',
-  _listaNombreDraft: '',
-  _listaCols: [''],
+  _listaCols: ['','',''],
   _acapOpen: {},
   _acapClipboard: null,
   _acapSearch: '',
@@ -430,15 +426,7 @@ let state = {
   _notasOnlyImportant: false,
   _authMode: 'login',
   _rememberLogin: getAuthPersistencePreference()!=='session',
-  _loginBusy: false,
-  _loginStatus: '',
-  _loginSlow: false,
-  _loginCanContinue: false,
-  _loginError: '',
-  _loginContinueDismissed: false,
   _cloudStatus: 'local',
-  _lastCloudError: null,
-  _cloudLastError: null,
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
   _lastModified: S.get('pp_last_modified', ''),
@@ -446,37 +434,6 @@ let state = {
   modal: null,
   modalData: {},
 };
-function getSafePerfilObject(input){
-  const p = input || {};
-  return {
-    nombre: typeof p?.nombre === 'string' ? p.nombre : '',
-    escuela: typeof p?.escuela === 'string' ? p.escuela : '',
-    institucion: typeof p?.institucion === 'string' ? p.institucion : '',
-    turno: typeof p?.turno === 'string' ? p.turno : '',
-    foto: typeof p?.foto === 'string' ? p.foto : '',
-    fotoUpdatedAt: typeof p?.fotoUpdatedAt === 'string' ? p.fotoUpdatedAt : ''
-  };
-}
-function showToastSafe(msg){
-  if(typeof showToast === 'function') showToast(msg);
-  else alert(msg);
-}
-function repairPerfilBeforeCloudSave(){
-  state.perfil = getSafePerfilObject(state.perfil);
-}
-function repairPerfilLocal(){
-  const safePerfil = getSafePerfilObject(state.perfil);
-  state.perfil = safePerfil;
-  try{
-    S.set('pp_perfil', safePerfil);
-    localStorage.setItem('pp_perfil', JSON.stringify(safePerfil));
-  }catch(e){
-    console.error('Error reparando pp_perfil:', e);
-  }
-  showToastSafe('Perfil reparado. Probá guardar nuevamente.');
-  render();
-}
-state.perfil = getSafePerfilObject(state.perfil);
 
 const PERSIST_DEFAULTS = {
   perfil: deepCopy(state.perfil),
@@ -515,8 +472,7 @@ function resetScopedState(options={}){
   state.vistaAsist = 'dia';
   state._listaActiva = null;
   state._listaModo = 'curso';
-  state._listaNombreDraft = '';
-  state._listaCols = [''];
+  state._listaCols = ['','',''];
   state._acapOpen = {};
   state._acapClipboard = null;
   state._acapSearch = '';
@@ -531,15 +487,7 @@ function resetScopedState(options={}){
   state._notasOnlyImportant = false;
   state._authMode = authMode;
   state._rememberLogin = rememberLogin;
-  state._loginBusy = false;
-  state._loginStatus = '';
-  state._loginSlow = false;
-  state._loginCanContinue = false;
-  state._loginError = '';
-  state._loginContinueDismissed = false;
   state._cloudStatus = 'local';
-  state._lastCloudError = null;
-  state._cloudLastError = null;
   state._toast = null;
   state.modal = null;
   state.modalData = {};
@@ -547,67 +495,7 @@ function resetScopedState(options={}){
   remoteHydrating = false;
   clearTimeout(remoteSaveTimer);
   remoteSaveTimer = null;
-  clearTimeout(loginSlowTimer);
-  clearTimeout(loginContinueTimer);
-  loginSlowTimer = null;
-  loginContinueTimer = null;
   resetProfilePhotoPreview();
-}
-function startLoginProgress(message){
-  clearTimeout(loginSlowTimer);
-  clearTimeout(loginContinueTimer);
-  state._loginBusy = true;
-  state._loginStatus = message || 'Ingresando...';
-  state._loginSlow = false;
-  state._loginCanContinue = false;
-  state._loginError = '';
-  state._loginContinueDismissed = false;
-  loginSlowTimer = setTimeout(()=>{
-    state._loginSlow = true;
-    if(!activeUser) render();
-    else if(state._loginBusy && !state._loginContinueDismissed) render();
-  }, 5000);
-  loginContinueTimer = setTimeout(()=>{
-    state._loginCanContinue = true;
-    if(!activeUser) render();
-    else if(state._loginBusy && !state._loginContinueDismissed) render();
-  }, 12000);
-}
-function updateLoginProgress(message){
-  state._loginBusy = true;
-  state._loginStatus = message || state._loginStatus || 'Cargando tus datos...';
-  state._loginError = '';
-  render();
-}
-function finishLoginProgress(){
-  clearTimeout(loginSlowTimer);
-  clearTimeout(loginContinueTimer);
-  loginSlowTimer = null;
-  loginContinueTimer = null;
-  state._loginBusy = false;
-  state._loginStatus = '';
-  state._loginSlow = false;
-  state._loginCanContinue = false;
-  state._loginError = '';
-  state._loginContinueDismissed = false;
-}
-function failLoginProgress(message, err){
-  clearTimeout(loginSlowTimer);
-  clearTimeout(loginContinueTimer);
-  loginSlowTimer = null;
-  loginContinueTimer = null;
-  state._loginBusy = false;
-  state._loginStatus = '';
-  state._loginSlow = false;
-  state._loginCanContinue = false;
-  state._loginContinueDismissed = false;
-  state._loginError = String(message || 'No se pudo iniciar sesión.');
-  if(err) console.error(err);
-  render();
-}
-function continuarConDatosDisponibles(){
-  state._loginContinueDismissed = true;
-  render();
 }
 function serializePersistedState(){
   return {
@@ -653,11 +541,6 @@ function applyPersistedState(data){
   Object.keys(PERSIST_DEFAULTS).forEach(k=>{
     if(isMeaningfulValue(source[k], state[k])) state[k] = source[k];
   });
-  console.log('Cargando listas:', source.listas);
-  console.log('Cargando listasGlobales:', source.listasGlobales);
-  if(typeof source.listas !== 'undefined') state.listas = source.listas || {};
-  if(typeof source.listasGlobales !== 'undefined') state.listasGlobales = source.listasGlobales || [];
-  if(typeof source.agenda !== 'undefined' && typeof source.eventos === 'undefined') state.eventos = source.agenda || [];
   if(source.config && typeof source.config.fastMode !== 'undefined' && !isMeaningfulValue(source.fastMode, state.fastMode)){
     state.fastMode = source.config.fastMode;
   }
@@ -697,234 +580,11 @@ function buildSyncedProfilePayload(){
     fotoUpdatedAt: perfil.fotoUpdatedAt || state._lastModified || new Date().toISOString()
   };
 }
-function getSafeProfileForFirestore(){
-  const perfil = state.perfil || {};
-  const cleanPerfil = {
-    nombre: typeof perfil?.nombre === 'string' ? perfil.nombre : '',
-    escuela: typeof perfil?.escuela === 'string' ? perfil.escuela : '',
-    institucion: typeof perfil?.institucion === 'string' ? perfil.institucion : '',
-    turno: typeof perfil?.turno === 'string' ? perfil.turno : '',
-    foto: typeof perfil?.foto === 'string' ? perfil.foto : '',
-    fotoUpdatedAt: typeof perfil?.fotoUpdatedAt === 'string' ? perfil.fotoUpdatedAt : ''
-  };
-  console.log('Perfil limpio para Firestore:', cleanPerfil);
-  return cleanPerfil;
-}
-function getCleanPerfilForFirestore(){
-  return getSafeProfileForFirestore();
-}
 function getCurrentStatePayload(){
   return serializePersistedState();
 }
-function getAppDataPayload(){
-  const payload = {
-    cursos: state.cursos,
-    alumnos: state.alumnos,
-    asistencia: state.asistencia,
-    acaps: state.acaps,
-    listas: state.listas || {},
-    listasGlobales: state.listasGlobales || [],
-    notas: state.notas,
-    agenda: state.eventos,
-    eventos: state.eventos,
-    horarios: state.horarios,
-    colors: state.colors,
-    plan: state.plan,
-    updatedAt: state._lastModified || new Date().toISOString()
-  };
-  return sanitizeForFirestore(payload);
-}
 function hasMeaningfulLocalState(){
   return hasMeaningfulPersistedData(getCurrentStatePayload());
-}
-function hasMeaningfulAppDataPayload(payload){
-  if(!payload || typeof payload!=='object') return false;
-  return !!(
-    (payload.cursos||[]).length ||
-    Object.keys(payload.alumnos||{}).length ||
-    Object.keys(payload.asistencia||{}).length ||
-    Object.keys(payload.acaps||{}).length ||
-    Object.keys(payload.listas||{}).length ||
-    (payload.listasGlobales||[]).length ||
-    (payload.notas||[]).length ||
-    (payload.agenda||[]).length ||
-    Object.keys(payload.horarios||{}).length
-  );
-}
-function isPlainObject(obj){
-  return Object.prototype.toString.call(obj) === '[object Object]';
-}
-function sanitizeForFirestore(value){
-  if(value === undefined) return undefined;
-  if(value === null) return null;
-  if(value instanceof Date) return value.toISOString();
-  if(typeof File !== 'undefined' && value instanceof File) return undefined;
-  if(typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
-  if(typeof Event !== 'undefined' && value instanceof Event) return undefined;
-  if(typeof Node !== 'undefined' && value instanceof Node) return undefined;
-  const t = typeof value;
-  if(t === 'string' || t === 'boolean') return value;
-  if(t === 'number') return Number.isFinite(value) ? value : null;
-  if(t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
-  if(Array.isArray(value)){
-    return value
-      .map(item=>sanitizeForFirestore(item))
-      .filter(item=>typeof item !== 'undefined');
-  }
-  if(isPlainObject(value)){
-    const out = {};
-    Object.keys(value).forEach(key=>{
-      const cleaned = sanitizeForFirestore(value[key]);
-      if(typeof cleaned !== 'undefined') out[key] = cleaned;
-    });
-    return out;
-  }
-  if(t === 'object'){
-    try{
-      const plain = JSON.parse(JSON.stringify(value));
-      return sanitizeForFirestore(plain);
-    }catch(_err){
-      return undefined;
-    }
-  }
-  return undefined;
-}
-function cleanForFirestore(value){
-  return sanitizeForFirestore(value);
-}
-function removePerfilDeep(value){
-  if(value === undefined) return undefined;
-  if(value === null) return null;
-  if(value instanceof Date) return value.toISOString();
-  if(typeof File !== 'undefined' && value instanceof File) return undefined;
-  if(typeof Blob !== 'undefined' && value instanceof Blob) return undefined;
-  if(typeof Event !== 'undefined' && value instanceof Event) return undefined;
-  if(typeof Node !== 'undefined' && value instanceof Node) return undefined;
-  const t = typeof value;
-  if(t === 'string' || t === 'boolean') return value;
-  if(t === 'number') return Number.isFinite(value) ? value : null;
-  if(t === 'function' || t === 'symbol' || t === 'bigint') return undefined;
-  if(Array.isArray(value)){
-    return value.map(item=>removePerfilDeep(item)).filter(item=>typeof item !== 'undefined');
-  }
-  if(isPlainObject(value)){
-    const out = {};
-    Object.keys(value).forEach(key=>{
-      if(key === 'perfil') return;
-      const cleaned = removePerfilDeep(value[key]);
-      if(typeof cleaned !== 'undefined') out[key] = cleaned;
-    });
-    return out;
-  }
-  if(t === 'object'){
-    try{
-      return removePerfilDeep(JSON.parse(JSON.stringify(value)));
-    }catch(_err){
-      return undefined;
-    }
-  }
-  return undefined;
-}
-function findPerfilPaths(value, path=''){
-  const matches = [];
-  const visit = (current, currentPath)=>{
-    if(!current || typeof current !== 'object') return;
-    if(Array.isArray(current)){
-      current.forEach((item, index)=>visit(item, currentPath ? `${currentPath}.${index}` : String(index)));
-      return;
-    }
-    Object.keys(current).forEach(key=>{
-      const nextPath = currentPath ? `${currentPath}.${key}` : key;
-      if(key === 'perfil') matches.push(nextPath);
-      visit(current[key], nextPath);
-    });
-  };
-  visit(value, path);
-  return matches;
-}
-function findInvalidFirestoreValues(obj, path=''){
-  const invalid = [];
-  const visit = (value, currentPath)=>{
-    if(value === undefined){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(value === null) return;
-    if(value instanceof Date) return;
-    if(typeof File !== 'undefined' && value instanceof File){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(typeof Blob !== 'undefined' && value instanceof Blob){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(typeof Event !== 'undefined' && value instanceof Event){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(typeof Node !== 'undefined' && value instanceof Node){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    const t = typeof value;
-    if(t === 'function' || t === 'symbol' || t === 'bigint'){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(t === 'number' && !Number.isFinite(value)){
-      invalid.push(currentPath || '(root)');
-      return;
-    }
-    if(Array.isArray(value)){
-      value.forEach((item, index)=>visit(item, currentPath ? `${currentPath}.${index}` : String(index)));
-      return;
-    }
-    if(isPlainObject(value)){
-      Object.keys(value).forEach(key=>visit(value[key], currentPath ? `${currentPath}.${key}` : key));
-      return;
-    }
-    if(t === 'object'){
-      invalid.push(currentPath || '(root)');
-    }
-  };
-  visit(obj, path);
-  return invalid;
-}
-async function safeFirestoreSet(ref, data, options = {}, label = 'unknown'){
-  console.log('Firestore write label:', label);
-  console.warn('Rutas perfil detectadas antes de limpiar:', findPerfilPaths(data));
-  const cleaned = removePerfilDeep(data);
-  console.warn('Rutas perfil después de limpiar:', findPerfilPaths(cleaned));
-  console.log('Payload final Firestore:', cleaned);
-  const remainingPerfil = findPerfilPaths(cleaned);
-  if(remainingPerfil.length){
-    const err = new Error('Bloqueado guardado: todavía existe perfil en ' + remainingPerfil.join(', '));
-    setLastCloudError({
-      code: 'firestore/perfil-blocked',
-      message: err.message,
-      stack: err.stack || ''
-    });
-    render();
-    throw err;
-  }
-  try{
-    return await ref.set(cleaned, options);
-  }catch(error){
-    console.error('Error real guardando en Firestore:', error);
-    setLastCloudError({
-      code: error?.code || '',
-      message: error?.message || String(error),
-      stack: error?.stack || ''
-    });
-    render();
-    throw error;
-  }
-}
-function hasMeaningfulListState(listas, listasGlobales){
-  const hasListas = !!(listas && typeof listas === 'object' && Object.keys(listas).length);
-  const hasGlobales = Array.isArray(listasGlobales) && listasGlobales.length > 0;
-  return hasListas || hasGlobales;
 }
 function applyRemoteProfileFromUserDoc(data, options={}){
   const remotePerfil = data?.perfil;
@@ -958,8 +618,6 @@ function applyRemoteProfileFromUserDoc(data, options={}){
   return changed;
 }
 function persistLocalState(){
-  console.log('Guardando listas:', state.listas);
-  console.log('Guardando listasGlobales:', state.listasGlobales);
   S.set('pp_perfil',state.perfil);
   S.set('pp_user_profile',state.userProfile);
   S.set('pp_plan',state.plan);
@@ -1002,7 +660,6 @@ function reloadScopedLocalState(){
   state.colors = S.get('pp_colors', deepCopy(PERSIST_DEFAULTS.colors));
   state.fastMode = S.get('pp_fast_mode', PERSIST_DEFAULTS.fastMode);
   state._lastModified = S.get('pp_last_modified', PERSIST_DEFAULTS._lastModified);
-  state.perfil = getSafePerfilObject(state.perfil);
   state.userProfile = {
     ...(state.userProfile||{}),
     uid: state.userProfile?.uid || activeUser?.uid || '',
@@ -1031,35 +688,27 @@ function getFirestoreDocRef(mode){
   if(mode==='legacy') return firestoreDb.collection('users').doc(uid).collection('data').doc('appState');
   return firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
 }
-async function ensureUserDocument(user){
-  const uid = String(user?.uid || user?.id || '').trim();
-  if(!firestoreEnabled || !uid) return false;
-  const email = String(user?.email || '').trim().toLowerCase();
+async function ensureUserDirectoryDoc(userLike){
+  const uid = String(userLike?.uid || userLike?.id || '').trim();
+  const email = String(userLike?.email || '').trim().toLowerCase();
+  if(!firestoreEnabled || !uid || !email) return false;
   try{
     const ref = getUserDocRef(uid);
     if(!ref) return false;
     const snap = await ref.get();
-    const now = new Date().toISOString();
-    if(!snap.exists){
-      await safeFirestoreSet(ref, {
-        uid,
-        email,
-        plan: isAdminEmail(email) ? 'premium' : 'free',
-        createdAt: now,
-        updatedAt: now
-      }, {merge:true}, 'ensureUserDocument:new');
-    } else {
-      await safeFirestoreSet(ref, {
-        uid,
-        email,
-        updatedAt: now
-      }, {merge:true}, 'ensureUserDocument:update');
-    }
-    console.log('User document ensured', email);
+    const current = snap.exists ? (snap.data() || {}) : {};
+    const nextPlan = current.plan === 'premium' ? 'premium' : (current.plan === 'free' ? 'free' : 'free');
+    await ref.set({
+      uid,
+      email,
+      nombre: String(userLike?.displayName || userLike?.nombre || current.nombre || '').trim(),
+      plan: nextPlan,
+      createdAt: current.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }, {merge:true});
     return true;
-  }catch(error){
-    console.error('Error ensureUserDocument:', error);
-    showToast('No pude registrar el usuario en la nube');
+  }catch(err){
+    console.error('Ensure user doc error', err);
     return false;
   }
 }
@@ -1075,12 +724,13 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
       state.plan = 'premium';
       S.set('pp_plan', state.plan);
       try{
-        await safeFirestoreSet(ref, {
+        await ref.set({
           plan: 'premium',
           email: activeUser?.email || snap.data()?.email || '',
           nombre: getVisibleUserName() || '',
+          perfil: buildSyncedProfilePayload(),
           updatedAt: new Date().toISOString()
-        }, {merge:true}, 'loadUserPlanFromFirestore:admin');
+        }, {merge:true});
       }catch(writeErr){
         console.warn('Could not persist admin premium plan to Firestore.', writeErr);
       }
@@ -1092,14 +742,15 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
     if(remotePlan!=='premium' && remotePlan!=='free'){
       console.warn('Firestore plan missing or invalid. Defaulting to free.', {uid});
       try{
-        await safeFirestoreSet(ref, {
+        await ref.set({
           uid,
           plan: 'free',
           email: activeUser?.email || '',
           nombre: getVisibleUserName() || '',
           createdAt: snap.data()?.createdAt || new Date().toISOString(),
+          perfil: buildSyncedProfilePayload(),
           updatedAt: new Date().toISOString()
-        }, {merge:true}, 'loadUserPlanFromFirestore:default-free');
+        }, {merge:true});
       }catch(writeErr){
         console.warn('Could not persist default free plan to Firestore.', writeErr);
       }
@@ -1111,70 +762,65 @@ async function loadUserPlanFromFirestore(uid=activeUser?.uid){
   }
 }
 async function loadDataFromFirestore(){
-  return loadCloudData();
+  try{
+    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
+    if(!authUid || authUid!==getActiveUserUid()){
+      console.warn('Skipping Firestore load: no authenticated uid available.');
+      return false;
+    }
+    const userRef = getUserDocRef(authUid);
+    const userSnap = userRef ? await userRef.get() : null;
+    const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
+    let data = null;
+    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
+    for(const ref of refs){
+      const snap = await ref.get();
+      if(snap.exists && hasMeaningfulPersistedData(snap.data())){
+        data = snap.data();
+        break;
+      }
+    }
+    const planLoaded = await loadUserPlanFromFirestore();
+    if(!data){
+      if(hasMeaningfulLocalState()){
+        await saveToFirestore();
+      }
+      return planLoaded;
+    }
+    remoteHydrating = true;
+    if (hasMeaningfulLocalState()) {
+      console.log("Usando datos locales como fuente principal");
+      await saveToFirestore();
+      return true;
+    }
+    applyPersistedState(data);
+    if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
+    if(isAdminUser()) state.plan = 'premium';
+    else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
+    console.log('Datos cargados desde Firestore', data.state && typeof data.state==='object' ? data.state : data);
+    remoteHydrating = false;
+    persistLocalState();
+    return true;
+  }catch(err){
+    console.error('Firestore load error', err);
+    return false;
+  }finally{
+    remoteHydrating = false;
+  }
 }
 function queueFirestoreSave(){
-  console.log('queueFirestoreSave ejecutado');
-  if(remoteHydrating){
-    console.warn('queueFirestoreSave cancelado: remoteHydrating activo');
-    return;
-  }
+  if(remoteHydrating) return;
   if(!activeUser?.uid || !firestoreEnabled){
-    console.warn('queueFirestoreSave cancelado: sin usuario activo o Firebase deshabilitado', {
-      activeUid: activeUser?.uid || '',
-      authUid: firebaseAuth?.currentUser?.uid || '',
-      firestoreEnabled
-    });
     setCloudStatus('local');
     return;
   }
   if(typeof navigator!=='undefined' && !navigator.onLine){
-    console.warn('queueFirestoreSave cancelado: sin conexión');
     setCloudStatus('offline');
     return;
   }
   clearTimeout(remoteSaveTimer);
   setCloudStatus('syncing');
-  remoteSaveTimer = setTimeout(()=>{
-    console.log('queueFirestoreSave -> saveToFirestore');
-    saveToFirestore();
-  }, 500);
-}
-function setLastCloudError(error){
-  const details = {
-    code: error?.code || '',
-    message: error?.message || String(error || ''),
-    stack: error?.stack || '',
-    time: new Date().toISOString()
-  };
-  state._lastCloudError = details;
-  state._cloudLastError = details;
-  return details;
-}
-function clearLastCloudError(){
-  state._lastCloudError = null;
-  state._cloudLastError = null;
-}
-async function copiarUltimoErrorNube(){
-  const error = state._lastCloudError || state._cloudLastError;
-  if(!error){
-    showToast('No hay error para copiar');
-    return;
-  }
-  const text = [
-    'Último error nube',
-    `Hora: ${error.time || ''}`,
-    `Code: ${error.code || ''}`,
-    `Message: ${error.message || ''}`,
-    `Stack: ${error.stack || ''}`
-  ].join('\n');
-  try{
-    await navigator.clipboard.writeText(text);
-    showToast('Error copiado');
-  }catch(err){
-    console.error('Clipboard error', err);
-    alert(text);
-  }
+  remoteSaveTimer = setTimeout(()=>{ saveToFirestore(); }, 500);
 }
 async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!firestoreEnabled || !uid) return false;
@@ -1182,156 +828,57 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
   if(!userRef) return false;
   const currentSnap = await userRef.get();
   const current = currentSnap.exists ? (currentSnap.data() || {}) : {};
-  const userDoc = {
+  await userRef.set({
     uid,
     plan: plan === 'premium' ? 'premium' : 'free',
     email: String(extra.email || current.email || '').trim().toLowerCase(),
     nombre: extra.nombre || current.nombre || '',
     createdAt: current.createdAt || new Date().toISOString(),
+    perfil: extra.perfil || buildSyncedProfilePayload(),
     updatedAt: new Date().toISOString()
-  };
-  if(userDoc && userDoc.perfil){
-    console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
-    delete userDoc.perfil;
-  }
-  await safeFirestoreSet(userRef, userDoc, {merge:true}, 'upsertRemoteUserPlan');
+  }, {merge:true});
   return true;
 }
-async function saveCloudData(){
-  let nextStatus = 'local';
+async function saveToFirestore(){
+  let nextStatus = 'synced';
   try{
-    clearLastCloudError();
-    repairPerfilBeforeCloudSave();
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
+      nextStatus = 'local';
       console.warn('Skipping Firestore save: no authenticated uid available.');
-      return false;
+      return;
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
-    const rawPayload = getAppDataPayload();
-    if(rawPayload.perfil){
-      console.error('ERROR: appData/main todavía contiene perfil', rawPayload.perfil);
-      delete rawPayload.perfil;
-    }
-    const invalidPaths = findInvalidFirestoreValues(rawPayload);
-    const cleanPayload = sanitizeForFirestore(rawPayload);
-    const cleanUserDoc = sanitizeForFirestore({
-      uid: authUid,
-      plan: state.plan === 'premium' ? 'premium' : 'free',
-      email: String(activeUser?.email || '').trim().toLowerCase(),
-      nombre: getVisibleUserName(),
-      createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
-      updatedAt: state._lastModified || new Date().toISOString()
-    });
-    if(cleanUserDoc && cleanUserDoc.perfil){
-      console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
-      delete cleanUserDoc.perfil;
-    }
-    console.log('UID actual:', authUid);
-    console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
-    console.log('Payload original appData/main:', rawPayload);
-    console.warn('Valores inválidos Firestore:', invalidPaths);
-    console.log('Payload limpio appData/main:', cleanPayload);
-    console.log('Payload limpio final:', cleanPayload);
-    console.log('Payload appData/main sin perfil:', rawPayload);
-    console.log('Payload final appData/main keys:', Object.keys(rawPayload));
-    console.log('Guardando listas:', state.listas);
-    console.log('Guardando listasGlobales:', state.listasGlobales);
-    console.log('Guardando en Firestore appData/main');
-    console.log('Guardando appData/main con listasGlobales:', cleanPayload?.listasGlobales);
-    console.log('Guardando appData/main', cleanPayload);
+    const payload = getCurrentStatePayload();
     if(!ref){
-      setLastCloudError({
-        code: 'firestore/invalid-ref',
-        message: 'No se pudo obtener la referencia appData/main',
-        stack: ''
-      });
-      console.error('No se pudo verificar el guardado en la nube');
-      render();
-      return false;
-    }
-    if(!hasMeaningfulAppDataPayload(cleanPayload || {})){
-      return false;
+      nextStatus = 'local';
+      return;
     }
     await Promise.all([
-      safeFirestoreSet(ref, rawPayload, {merge:true}, 'users/{uid}/appData/main'),
-      userRef ? safeFirestoreSet(userRef, cleanUserDoc, {merge:true}, 'users/{uid}') : Promise.resolve()
+      ref.set({
+        state: payload,
+        meta: {
+          updatedAt: state._lastModified || new Date().toISOString(),
+          dataKeys: APP_DATA_KEYS
+        }
+      }, {merge:true}),
+      userRef ? userRef.set({
+        uid: authUid,
+        plan: state.plan === 'premium' ? 'premium' : 'free',
+        email: String(activeUser?.email || '').trim().toLowerCase(),
+        nombre: getVisibleUserName(),
+        perfil: buildSyncedProfilePayload(),
+        createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
+        updatedAt: state._lastModified || new Date().toISOString()
+      }, {merge:true}) : Promise.resolve()
     ]);
-    const verifySnap = await ref.get();
-    if(!verifySnap.exists){
-      setLastCloudError({
-        code: 'firestore/not-verified',
-        message: 'No se pudo verificar el guardado en la nube',
-        stack: ''
-      });
-      console.error('No se pudo verificar el guardado en la nube');
-      nextStatus = 'local';
-      render();
-      return false;
-    }
-    nextStatus = 'synced';
-    console.log('Datos guardados en Firestore', cleanPayload);
-    return true;
+    console.log('Datos guardados en Firestore', payload);
   }catch(err){
-    console.error('Error real guardando appData/main:', err);
-    const details = setLastCloudError({
-      code: err?.code || 'firestore/error',
-      message: err?.message || 'No se pudo guardar en la nube',
-      stack: err?.stack || ''
-    });
-    if(err?.fieldPath || err?.customData?.fieldPath){
-      details.field = err?.fieldPath || err?.customData?.fieldPath || '';
-    }
+    console.error('Firestore save error', err);
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
-    render();
-    return false;
   }finally{
     setCloudStatus(nextStatus);
-  }
-}
-async function saveToFirestore(){
-  console.log('saveToFirestore ejecutado');
-  return saveCloudData();
-}
-async function loadCloudData(){
-  try{
-    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
-    if(!authUid || authUid!==getActiveUserUid()){
-      console.warn('Skipping Firestore load: no authenticated uid available.');
-      return false;
-    }
-    const planLoaded = await loadUserPlanFromFirestore();
-    const ref = getFirestoreDocRef('main');
-    if(!ref) return planLoaded;
-    const snap = await ref.get();
-    if(!snap.exists){
-      showToast('Sin datos en nube todavía');
-      return planLoaded;
-    }
-    const data = snap.data() || {};
-    console.log('Cargando appData/main', data);
-    remoteHydrating = true;
-    const source = data.state && typeof data.state==='object' ? data.state : data;
-    const localHasLists = hasMeaningfulListState(state.listas, state.listasGlobales);
-    const remoteHasLists = hasMeaningfulListState(source?.listas, source?.listasGlobales);
-    if(hasMeaningfulLocalState() && localHasLists && !remoteHasLists){
-      console.log("Usando datos locales como fuente principal");
-      await saveCloudData();
-      return true;
-    }
-    applyPersistedState(data);
-    if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
-    if(isAdminUser()) state.plan = 'premium';
-    else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
-    persistLocalState();
-    return true;
-  }catch(error){
-    console.error('Error loadCloudData', error);
-    showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo cargar desde la nube'}`);
-    return false;
-  }finally{
-    remoteHydrating = false;
   }
 }
 function hydrateFromFirestoreInBackground(){
@@ -1369,7 +916,6 @@ function hydrateFromFirestoreInBackground(){
 }
 
 function save(){
-  console.log('SAVE ejecutado');
   state._lastModified = new Date().toISOString();
   persistLocalState();
   try{
@@ -1441,116 +987,46 @@ function parseHorarioData(data){
   return {horaDesde:'', horaHasta:''};
 }
 function parseTimeToMinutes(value){
-  const normalized = String(value||'').trim();
-  const withMinutes = /^\d{1,2}$/.test(normalized) ? `${normalized}:00` : normalized;
-  const match = withMinutes.match(/^(\d{1,2}):(\d{2})$/);
+  const match = String(value||'').trim().match(/^(\d{1,2}):(\d{2})$/);
   if(!match) return null;
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
   if(hours<0 || hours>23 || minutes<0 || minutes>59) return null;
   return hours * 60 + minutes;
 }
-function parseAcapHorario(horario){
-  const value = String(horario||'').trim();
-  if(!value) return {horaDesde:'', horaHasta:'', start:null, end:null};
-  const normalizedValue = value
-    .replace(/^de\s+/i, '')
-    .replace(/^desde\s+/i, 'Desde ')
-    .replace(/^hasta\s+/i, 'Hasta ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const rangeMatch = normalizedValue.match(/(\d{1,2}(?::\d{2})?)\s*(?:a|-)\s*(\d{1,2}(?::\d{2})?)/i);
-  if(rangeMatch){
-    const horaDesde = rangeMatch[1];
-    const horaHasta = rangeMatch[2];
-    return {
-      horaDesde,
-      horaHasta,
-      start: parseTimeToMinutes(horaDesde),
-      end: parseTimeToMinutes(horaHasta)
-    };
-  }
-  const fromMatch = normalizedValue.match(/^desde\s+(\d{1,2}(?::\d{2})?)$/i);
-  if(fromMatch){
-    const horaDesde = fromMatch[1];
-    return {
-      horaDesde,
-      horaHasta:'',
-      start: parseTimeToMinutes(horaDesde),
-      end:null
-    };
-  }
-  const toMatch = normalizedValue.match(/^hasta\s+(\d{1,2}(?::\d{2})?)$/i);
-  if(toMatch){
-    const horaHasta = toMatch[1];
-    return {
-      horaDesde:'',
-      horaHasta,
-      start:null,
-      end: parseTimeToMinutes(horaHasta)
-    };
-  }
-  return {horaDesde:'', horaHasta:'', start:null, end:null};
-}
 function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
-  const acaps = state.acaps || {};
-  const alumnosByDay = new Map();
-  const recordsToday = [];
-  Object.entries(acaps).forEach(([key, data])=>{
+  const byStudent = new Map();
+  Object.entries(state.acaps||{}).forEach(([key, data])=>{
     if(!data) return;
-    const match = String(key).match(/^(.+?)_(.+?)_(\d{4}-\d{2}-\d{2})$/);
-    if(!match) return;
-    const cursoId = match[1];
-    const alumnoId = match[2];
-    const recordDate = match[3];
-    if(recordDate !== fecha) return;
-    const alumno = (state.alumnos?.[cursoId] || []).find(a=>a.id===alumnoId);
+    const parts = key.split('_');
+    if(parts.length < 3) return;
+    const recordDate = parts.slice(-1)[0];
+    if(recordDate!==fecha) return;
+    const cursoId = parts[0];
+    const alumnoId = parts[1];
+    const alumno = (state.alumnos[cursoId]||[]).find(a=>a.id===alumnoId);
     if(!alumno) return;
-    const dedupeKey = `${cursoId}_${alumnoId}`;
-    const item = {
-      key,
+    if(!(data?.empresa || data?.horario || data?.horaDesde || data?.horaHasta || data?.lugar)) return;
+    byStudent.set(`${cursoId}_${alumnoId}`, {
       cursoId,
       alumnoId,
-      fecha: recordDate,
       nombre: alumno.nombre,
-      empresa: String(data?.empresa || data?.lugar || '').trim(),
-      horario: String(data?.horario || buildHorario(data?.horaDesde||'', data?.horaHasta||'') || '').trim(),
       data
-    };
-    recordsToday.push(item);
-    if(alumnosByDay.has(dedupeKey)) return;
-    alumnosByDay.set(dedupeKey, item);
+    });
   });
   const nowMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
-  const activeNowMap = new Map();
-  recordsToday.forEach(item=>{
-    const parsed = parseAcapHorario(item.horario);
-    let active = false;
-    if(parsed.start !== null && parsed.end !== null){
-      active = nowMinutes >= parsed.start && nowMinutes <= parsed.end;
-    }else if(parsed.start !== null){
-      active = nowMinutes >= parsed.start;
-    }else if(parsed.end !== null){
-      active = nowMinutes <= parsed.end;
-    }
-    console.log('ACAP ahora registro:', {
-      key: item.key,
-      alumno: item.nombre,
-      fecha: item.fecha,
-      horario: item.horario,
-      parsed,
-      ahoraMinutos: nowMinutes,
-      activo
-    });
-    if(!active) return;
-    const dedupeKey = `${item.cursoId}_${item.alumnoId}`;
-    if(!activeNowMap.has(dedupeKey)) activeNowMap.set(dedupeKey, item);
+  const activeNow = [...byStudent.values()].filter(item=>{
+    const {horaDesde, horaHasta} = parseHorarioData(item.data);
+    const start = parseTimeToMinutes(horaDesde);
+    const end = parseTimeToMinutes(horaHasta);
+    if(start===null || end===null) return false;
+    return nowMinutes >= start && nowMinutes <= end;
   });
   return {
-    totalHoy: alumnosByDay.size,
-    alumnosHoy: [...alumnosByDay.values()],
-    totalAhora: activeNowMap.size,
-    alumnosAhora: [...activeNowMap.values()]
+    totalHoy: byStudent.size,
+    alumnosHoy: [...byStudent.values()],
+    totalAhora: activeNow.length,
+    alumnosAhora: activeNow
   };
 }
 function getAcapEntriesForAlumno(cursoId, alumnoId, opts){
@@ -1730,42 +1206,25 @@ async function actualizarPlanDesdePanelAdmin(plan){
     showToast('Solo el administrador puede actualizar planes');
     return;
   }
-  if(!firestoreEnabled || !firestoreDb){
-    showToast('Firebase no está disponible');
-    return;
-  }
   const target = state._adminLookupResult;
   if(!target?.exists || !target?.uid){
     showToast('Primero buscá un usuario válido');
     return;
   }
   try{
-    const uid = String(target.uid || '').trim();
-    const normalizedPlan = plan === 'premium' ? 'premium' : 'free';
-    console.log('Activando premium para UID:', uid);
-    const ref = getUserDocRef(uid);
-    if(!ref) throw {code:'firestore/invalid-user-ref', message:'No se pudo obtener la referencia del usuario.'};
-    await safeFirestoreSet(ref, {
-      plan: normalizedPlan,
-      updatedAt: new Date().toISOString()
-    }, {merge:true}, 'admin:update-plan');
-    const snap = await ref.get();
-    const data = snap.exists ? (snap.data() || {}) : {};
-    console.log('Plan actualizado:', data);
+    await setUserPlanValue(plan, target.uid, {
+      email: target.email || '',
+      nombre: target.nombre || ''
+    });
     state._adminLookupResult = {
       ...target,
-      uid,
-      email: String(data.email || target.email || '').trim().toLowerCase(),
-      nombre: String(data.nombre || target.nombre || '').trim(),
-      plan: data.plan === 'premium' ? 'premium' : 'free'
+      plan: plan === 'premium' ? 'premium' : 'free'
     };
-    showToast(normalizedPlan === 'premium' ? 'Usuario actualizado a Premium' : 'Usuario actualizado a Free');
+    showToast('Usuario actualizado correctamente');
     render();
   }catch(err){
     console.error('Admin plan update error', err);
-    const code = err?.code || 'firestore/error';
-    const message = err?.message || 'No se pudo actualizar el usuario';
-    showToast(`${code}: ${message}`);
+    showToast('No se pudo actualizar el usuario');
   }
 }
 async function borrarDatosUsuarioDesdePanelAdmin(){
@@ -1984,23 +1443,12 @@ function buildApp(){
     local: {text:'Guardado local / sin conexión', bg:'#f3f4f6', color:'#666'},
   };
   const cloudUi = cloudStatusMap[state._cloudStatus||'local'];
-  const loginLoadingOverlay = (activeUser && state._loginBusy && !state._loginContinueDismissed) ? `
-      <div style="position:fixed;inset:0;z-index:3200;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;padding:24px">
-        <div class="card" style="max-width:420px;width:100%;text-align:center">
-          <div style="font-weight:900;font-size:20px;color:var(--primary);margin-bottom:8px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
-          <div style="font-size:15px;color:#333;font-weight:700;margin-bottom:8px">${esc(state._loginStatus || 'Cargando tus datos...')}</div>
-          <div style="width:42px;height:42px;border:4px solid #dbe4ff;border-top-color:var(--accent);border-radius:50%;margin:0 auto 12px;animation:spin 1s linear infinite"></div>
-          ${state._loginSlow ? `<div style="font-size:13px;color:#777;line-height:1.5;margin-bottom:10px">Está tardando un poco más de lo normal...</div>` : ``}
-          ${state._loginCanContinue ? `<button onclick="continuarConDatosDisponibles()" class="btn-ghost" style="width:auto;padding:10px 14px">Continuar con datos disponibles</button>` : ``}
-        </div>
-      </div>` : '';
   return `
     <div>
       ${html}
       ${showNav ? buildBottomNav() : ''}
       ${showFab ? `<button class="fab" onclick="openModal('curso')">+</button>` : ''}
       ${state.modal ? buildModal() : ''}
-      ${loginLoadingOverlay}
       ${activeUser ? `<div style="position:fixed;right:12px;bottom:${showNav?76:18}px;z-index:2500;background:${cloudUi.bg};color:${cloudUi.color};padding:8px 12px;border-radius:999px;font-size:11px;font-weight:700;box-shadow:0 2px 10px rgba(0,0,0,.08)">${esc(cloudUi.text)}</div>` : ''}
       ${state._toast ? `<div style="position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:3000;background:#1f7a3f;color:#fff;padding:10px 14px;border-radius:12px;font-size:12px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.18)">${esc(state._toast)}</div>` : ''}
     </div>
@@ -2010,7 +1458,6 @@ function buildApp(){
 function buildAuthScreen(){
   const mode = state._authMode==='register' ? 'register' : 'login';
   const remember = state._rememberLogin !== false;
-  const loginButtonText = state._loginBusy ? 'Ingresando...' : 'Iniciar sesión';
   return `<div class="screen" style="max-width:500px;margin:0 auto;padding-top:42px">
     <div style="text-align:center;margin-bottom:24px">
       <div style="font-size:28px;font-weight:900;color:var(--primary);letter-spacing:-.5px">PRECEPTOR<span style="color:var(--accent)">PRO</span></div>
@@ -2030,9 +1477,6 @@ function buildAuthScreen(){
       ` : `
         <div style="margin-bottom:12px"><label>EMAIL</label><input id="auth_login_email" class="inp" type="email" placeholder="nombre@correo.com"/></div>
         <div style="margin-bottom:12px"><label>CONTRASEÑA</label><input id="auth_login_pass" class="inp" type="password" placeholder="Contraseña"/></div>
-        ${state._loginStatus ? `<div style="font-size:12px;color:var(--accent);font-weight:700;line-height:1.5;margin-bottom:10px">${esc(state._loginStatus)}</div>` : ``}
-        ${state._loginSlow ? `<div style="font-size:12px;color:#777;line-height:1.5;margin-bottom:10px">Está tardando un poco más de lo normal...</div>` : ``}
-        ${state._loginError ? `<div style="font-size:12px;color:#c0392b;font-weight:700;line-height:1.5;margin-bottom:10px">${esc(state._loginError)}</div>` : ``}
         <label style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;cursor:pointer">
           <input type="checkbox" id="auth_remember" ${remember?'checked':''} onchange="setRememberLogin(this.checked)" style="margin-top:3px"/>
           <span style="font-size:13px;color:#555;line-height:1.4">
@@ -2040,8 +1484,7 @@ function buildAuthScreen(){
             <span style="font-size:12px;color:#777">Si no marcás esta opción, tendrás que iniciar sesión nuevamente al volver a abrir la app.</span>
           </span>
         </label>
-        <button onclick="iniciarSesion()" class="btn-primary" ${state._loginBusy?'disabled style="opacity:.7;cursor:not-allowed"':''}>${loginButtonText}</button>
-        ${state._loginCanContinue && !activeUser ? `<button onclick="continuarConDatosDisponibles()" class="btn-ghost" style="margin-top:10px">Continuar con datos disponibles</button>` : ``}
+        <button onclick="iniciarSesion()" class="btn-primary">Iniciar sesión</button>
         <button onclick="recuperarContrasena()" style="margin-top:10px;background:none;border:none;color:var(--accent);font-weight:700;font-size:13px;width:100%">Olvidé mi contraseña</button>
       `}
     </div>
@@ -2112,13 +1555,13 @@ function buildHome(){
 
   const notifsHoy = [];
   const notifsProx = [];
-  notifsHoy.push(pushNotif([
+  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
     `acap_${hoy}`,
-    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">${acapSummary.totalHoy ? `Hoy tienen ACAP: ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'}` : 'No hay alumnos con ACAP hoy'}</div>${acapSummary.totalHoy ? `<div style="font-size:12px;color:#7d5d00;margin-top:4px;line-height:1.45">${acapSummary.alumnosHoy.slice(0,4).map(a=>`- ${esc(a.nombre)}${a.empresa?` — ${esc(a.empresa)}`:''} — ${esc(a.horario || 'Sin horario')}`).join('<br/>')}${acapSummary.totalHoy>4?'<br/>...':''}</div>` : ''}</div></div>`
+    `<div class="notif" style="background:#fff8e1;border-left:4px solid #f39c12"><span style="font-size:22px">💼</span><div><div style="font-weight:700;color:#e67e22;font-size:14px">ACAP del día</div><div style="font-size:12px;color:#946200">Hoy tienen ACAP: ${acapSummary.totalHoy} alumno${acapSummary.totalHoy===1?'':'s'}</div><div style="font-size:12px;color:#7d5d00;margin-top:3px">${esc(acapSummary.alumnosHoy.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalHoy>4?'...':''}</div></div></div>`
   ]));
-  notifsHoy.push(pushNotif([
+  if(acapSummary.totalHoy) notifsHoy.push(pushNotif([
     `acap_now_${hoy}`,
-    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">ACAP ahora</div><div style="font-size:12px;color:#5c6f82">${acapSummary.totalAhora ? `Ahora están en ACAP: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}` : 'No hay alumnos en ACAP ahora'}</div>${acapSummary.totalAhora ? `<div style="font-size:12px;color:#4c6175;margin-top:4px;line-height:1.45">${acapSummary.alumnosAhora.slice(0,4).map(a=>`- ${esc(a.nombre)}${a.empresa?` — ${esc(a.empresa)}`:''} — ${esc(a.horario || 'Sin horario')}`).join('<br/>')}${acapSummary.totalAhora>4?'<br/>...':''}</div>` : ''}</div></div>`
+    `<div class="notif" style="background:#f7fbff;border-left:4px solid #2980b9"><span style="font-size:22px">⏰</span><div><div style="font-weight:700;color:#1f5f8b;font-size:14px">${acapSummary.totalAhora ? `Ahora están en ACAP: ${acapSummary.totalAhora} alumno${acapSummary.totalAhora===1?'':'s'}` : 'No hay alumnos en ACAP ahora'}</div><div style="font-size:12px;color:#5c6f82">${acapSummary.totalAhora ? `${esc(acapSummary.alumnosAhora.slice(0,4).map(a=>a.nombre).join(', '))}${acapSummary.totalAhora>4?'...':''}` : 'Se actualizará automáticamente según el horario actual.'}</div></div></div>`
   ]));
   if(ferHoy) notifsHoy.push(pushNotif([
     `feriado_${ferHoy.fecha}`,
@@ -2523,7 +1966,6 @@ function buildListas(c){
         <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${totalChecks} / ${totalPosibles} marcados</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button onclick="event.stopPropagation();duplicarLista(${i})" style="background:none;border:none;color:var(--accent);padding:6px">${ICONS.copy || '⧉'}</button>
         <button onclick="event.stopPropagation();borrarLista(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
         <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
@@ -2541,7 +1983,6 @@ function buildListas(c){
         <div style="font-size:11px;color:var(--accent);margin-top:4px;font-weight:600">${(l.miembros||[]).length} alumnos · ${totalChecks} / ${totalPosibles} marcados</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
-        <button onclick="event.stopPropagation();duplicarListaGlobal(${i})" style="background:none;border:none;color:var(--accent);padding:6px">${ICONS.copy || '⧉'}</button>
         <button onclick="event.stopPropagation();borrarListaGlobal(${i})" style="background:none;border:none;color:#e74c3c;padding:6px">${ICONS.trash}</button>
         <span style="color:#ccc">${ICONS.chevR}</span>
       </div>
@@ -2873,7 +2314,6 @@ function buildConfig(){
   const cols = state.colors;
   const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
   const adminLookup = state._adminLookupResult || null;
-  const cloudLastError = state._lastCloudError || state._cloudLastError || null;
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -2954,7 +2394,6 @@ function buildConfig(){
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">EMERGENCIA / RECUPERACIÓN</div>
-      <div style="font-size:11px;color:#999;font-weight:700;margin-bottom:10px">Versión: ${esc(APP_VERSION)}</div>
       <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Herramientas manuales para salvar los datos actuales del dispositivo y volver a subirlos a la nube sin tocar el funcionamiento normal.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button onclick="exportarBackupEmergencia()" class="btn-primary" style="flex:1;min-width:180px">Exportar backup JSON</button>
@@ -2963,28 +2402,6 @@ function buildConfig(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="forzarSubirDatosActualesANube()" class="btn-ghost" style="width:100%">Forzar subir datos actuales a la nube</button>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-        <button onclick="testCloudSave()" class="btn-ghost" style="width:100%">Probar guardado nube</button>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-        <button onclick="testNoPerfilFirestoreSave()" class="btn-ghost" style="width:100%">Probar guardado sin perfil</button>
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-        <button onclick="repairPerfilLocal()" class="btn-ghost" style="width:100%">Reparar perfil local</button>
-      </div>
-      ${cloudLastError ? `
-        <div style="margin-top:12px;background:#fff5f5;border:1px solid #f2c7c7;border-radius:12px;padding:12px">
-          <div style="font-weight:700;font-size:13px;color:#c0392b;margin-bottom:8px">Último error nube:</div>
-          <div style="font-size:12px;color:#7a2e2e;line-height:1.5;white-space:pre-wrap;word-break:break-word"><strong>Hora:</strong> ${esc(cloudLastError.time||'')}
-<strong>Code:</strong> ${esc(cloudLastError.code||'')}
-<strong>Mensaje:</strong> ${esc(cloudLastError.message||'')}
-${cloudLastError.field ? `<strong>Campo:</strong> ${esc(cloudLastError.field)}` : ''}
-${cloudLastError.stack ? `<strong>Stack:</strong> ${esc(cloudLastError.stack)}` : ''}</div>
-          <div style="margin-top:10px;display:flex;justify-content:flex-end">
-            <button onclick="copiarUltimoErrorNube()" class="btn-ghost" style="width:auto;padding:8px 12px">Copiar error</button>
-          </div>
-        </div>
-      ` : ``}
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">SESIÓN</div>
@@ -3105,14 +2522,13 @@ function buildModalCurso(d){
 }
 
 function buildModalLista(d){
-  const cols = (state._listaCols && state._listaCols.length ? state._listaCols : ['']);
-  const nombre = state._listaNombreDraft || '';
+  const cols = state._listaCols||['','',''];
   const modo = d?.modo==='global' ? 'global' : 'curso';
   return `
-    <div style="margin-bottom:12px"><label>NOMBRE DE LA LISTA *</label><input class="inp" id="lista_nombre" value="${esc(nombre)}" oninput="setListaNombreDraft(this.value)" placeholder="Ej: Salida al museo"/></div>
+    <div style="margin-bottom:12px"><label>NOMBRE DE LA LISTA *</label><input class="inp" id="lista_nombre" placeholder="Ej: Salida al museo"/></div>
     <div style="margin-bottom:12px"><label>TIPO</label><div style="font-size:13px;color:${modo==='global'?'#e67e22':'#555'};font-weight:700">${modo==='global'?'Lista global':'Lista por curso'}</div></div>
     <div style="margin-bottom:12px"><label>COLUMNAS (una por check)</label>
-      <div id="listaCols">${cols.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px"><input class="inp lista-col" placeholder="${i===0?'Columna 1 o Ej: Autorización':`Columna ${i+1}`}" value="${esc(c)}" oninput="setListaColDraft(${i}, this.value)"/>${cols.length>1?`<button type="button" onclick="removeCol(${i})" style="background:none;border:none;color:#e74c3c;padding:4px">${ICONS.x}</button>`:''}</div>`).join('')}</div>
+      <div id="listaCols">${cols.map((c,i)=>`<div style="display:flex;gap:8px;margin-bottom:8px"><input class="inp lista-col" placeholder="Ej: Autorización" value="${esc(c)}"/>${cols.length>1?`<button onclick="removeCol(${i})" style="background:none;border:none;color:#e74c3c;padding:4px">${ICONS.x}</button>`:''}</div>`).join('')}</div>
       <button onclick="addCol()" style="background:#f0f0f0;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;color:#555">+ Agregar columna</button>
     </div>
     ${modo==='global' ? `
@@ -3354,21 +2770,12 @@ function setNotasOrden(v){ state._notasOrden=v; render(); }
 function setNotasSearch(v){ state._notasSearch=v; render(); }
 function toggleNotasImportantes(){ state._notasOnlyImportant=!state._notasOnlyImportant; render(); }
 function setListaActiva(i){ state._listaActiva = (i===null||i===undefined) ? null : i; render(); }
-function setListaNombreDraft(v){ state._listaNombreDraft = String(v||''); }
-function setListaColDraft(i, v){
-  const cols = [...(state._listaCols && state._listaCols.length ? state._listaCols : [''])];
-  cols[i] = String(v||'');
-  state._listaCols = cols;
-}
 function setAuthMode(mode){ state._authMode = mode==='register' ? 'register' : 'login'; render(); }
 function setRememberLogin(checked){ state._rememberLogin = !!checked; }
 
 // Modals
 function openModal(type, extra){
-  if(type==='lista'){
-    state._listaNombreDraft = '';
-    state._listaCols = [''];
-  }
+  state._listaCols=['','',''];
   if(type==='curso' && !canCreateMoreCourses()){
     alert('Tu plan gratuito permite 1 curso. Pasá a Premium para crear más cursos.');
     return;
@@ -3464,12 +2871,14 @@ function registrarUsuario(){
         S.set('pp_plan', state.plan);
         state.userProfile = {nombre, email, uid: user.uid || firebaseAuth?.currentUser?.uid || ''};
         state.perfil = {...(state.perfil||{}), nombre: (!String(state?.perfil?.nombre||'').trim() || isPlaceholderProfileName(state?.perfil?.nombre)) ? nombre : state.perfil.nombre};
-        const saveUserDoc = ensureUserDocument({
+        const saveUserDoc = getUserDocRef(user.uid || firebaseAuth?.currentUser?.uid)?.set({
           uid: user.uid || firebaseAuth?.currentUser?.uid || '',
+          plan: 'free',
           email,
           nombre,
-          displayName: nombre
-        });
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }, {merge:true});
         return Promise.resolve(saveUserDoc)
           .then(()=>sendFirebaseVerificationEmail(user));
       })
@@ -3499,11 +2908,9 @@ function registrarUsuario(){
 }
 
 function iniciarSesion(){
-  if(state._loginBusy) return;
   const email = (document.getElementById('auth_login_email')?.value||'').trim().toLowerCase();
   const password = document.getElementById('auth_login_pass')?.value || '';
   const remember = document.getElementById('auth_remember')?.checked !== false;
-  startLoginProgress('Ingresando...');
   if(firebaseEnabled && firebaseAuth){
     const persistence = remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
     setAuthPersistencePreference(remember);
@@ -3511,31 +2918,23 @@ function iniciarSesion(){
     firebaseAuth.setPersistence(persistence)
       .then(()=>firebaseAuth.signInWithEmailAndPassword(email, password))
       .then((cred)=>{
-        return Promise.resolve(ensureUserDocument(cred?.user))
-          .then(()=>cred);
-      })
-      .then((cred)=>{
-        updateLoginProgress('Cargando tus datos...');
         if(cred?.user && cred.user.emailVerified===false){
           showToast('Tu cuenta no está verificada');
           alert('Tu cuenta no está verificada. Revisá tu email o reenviá la verificación desde la app.');
         }
       })
       .catch(err=>{
-        failLoginProgress(firebaseAuthError(err), err);
         alert(firebaseAuthError(err));
       });
     return;
   }
   const user = getStoredUsers().find(u=>u.email===email && u.password===password);
   if(!user){
-    failLoginProgress('Email o contraseña incorrectos');
     alert('Email o contraseña incorrectos');
     return;
   }
   setAuthPersistencePreference(remember);
   state._rememberLogin = remember;
-  updateLoginProgress('Cargando tus datos...');
   setActiveUser({uid:user.id, id:user.id, nombre:user.nombre, email:user.email}, remember);
   window.location.reload();
 }
@@ -4258,9 +3657,9 @@ function importarLista(cursoId){
 
 // Listas
 function guardarLista(modo){
-  const nombre = String(state._listaNombreDraft || document.getElementById('lista_nombre')?.value || '').trim();
+  const nombre = document.getElementById('lista_nombre')?.value?.trim();
   if(!nombre) return;
-  const cols = (state._listaCols||[]).map(v=>String(v||'').trim()).filter(Boolean);
+  const cols = [...document.querySelectorAll('.lista-col')].map(i=>i.value.trim()).filter(Boolean);
   if(!cols.length) return;
   if(modo==='global'){
     if(!requirePremiumFeature('Esta función está disponible en Premium')) return;
@@ -4279,8 +3678,6 @@ function guardarLista(modo){
     state.listas[cursoId]=[...(state.listas[cursoId]||[]),{nombre,columnas:cols,checks:{}}];
   }
   state._listaActiva = null;
-  state._listaNombreDraft = '';
-  state._listaCols = [''];
   save(); closeModal();
 }
 function borrarLista(i){
@@ -4289,39 +3686,10 @@ function borrarLista(i){
   state.listas[cursoId]=(state.listas[cursoId]||[]).filter((_,j)=>j!==i);
   save(); render();
 }
-function duplicarLista(i){
-  const cursoId = state.cursoActivo;
-  const original = (state.listas[cursoId]||[])[i];
-  if(!original) return;
-  const copia = {
-    nombre: `${original.nombre || 'Lista'} (copia)`,
-    columnas: [...(original.columnas||[])],
-    checks: {}
-  };
-  state.listas[cursoId] = [...(state.listas[cursoId]||[]), copia];
-  save();
-  render();
-  showToastSafe('Lista duplicada correctamente');
-}
 function borrarListaGlobal(i){
   if(!confirm('¿Borrar lista global?')) return;
   state.listasGlobales=(state.listasGlobales||[]).filter((_,j)=>j!==i);
   save(); render();
-}
-function duplicarListaGlobal(i){
-  const original = (state.listasGlobales||[])[i];
-  if(!original) return;
-  const copia = {
-    id: uid(),
-    nombre: `${original.nombre || 'Lista'} (copia)`,
-    columnas: [...(original.columnas||[])],
-    checks: {},
-    miembros: [...(original.miembros||[])].map(m=>({...m}))
-  };
-  state.listasGlobales = [...(state.listasGlobales||[]), copia];
-  save();
-  render();
-  showToastSafe('Lista duplicada correctamente');
 }
 function toggleCheck(cursoId,listaIdx,key){
   if(cursoId==='global'){
@@ -4340,12 +3708,10 @@ function toggleCheck(cursoId,listaIdx,key){
   save(); render();
 }
 function addCol(){
-  state._listaCols=[...((state._listaCols && state._listaCols.length) ? state._listaCols : ['']),'']; render();
+  state._listaCols=[...(state._listaCols||['','']),'']; render();
 }
 function removeCol(i){
-  const next = (state._listaCols||[]).filter((_,j)=>j!==i);
-  state._listaCols = next.length ? next : [''];
-  render();
+  state._listaCols=(state._listaCols||[]).filter((_,j)=>j!==i); render();
 }
 
 // Eventos
@@ -4587,7 +3953,7 @@ function importarBackup(event){
       const data = JSON.parse(e.target?.result || '{}');
       if(!data || typeof data !== 'object') throw new Error('invalid');
       state = data;
-	      if(!state._listaCols || !state._listaCols.length) state._listaCols = [''];
+	      if(!state._listaCols) state._listaCols = ['','',''];
 	      if(typeof state._listaModo === 'undefined') state._listaModo = 'curso';
 	      if(!state._acapOpen) state._acapOpen = {};
       if(!state._acapClipboard) state._acapClipboard = null;
@@ -4630,7 +3996,7 @@ function normalizeImportedAppState(data){
     ...deepCopy(PERSIST_DEFAULTS),
     ...(source && typeof source === 'object' ? source : {})
   };
-  if(!next._listaCols || !next._listaCols.length) next._listaCols = [''];
+  if(!next._listaCols) next._listaCols = ['','',''];
   if(typeof next._listaModo === 'undefined') next._listaModo = 'curso';
   if(!next._acapOpen) next._acapOpen = {};
   if(!next._acapClipboard) next._acapClipboard = null;
@@ -4691,30 +4057,26 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
     return false;
   }
   try{
-    const rawPayload = getAppDataPayload();
-    if(rawPayload.perfil){
-      console.error('ERROR: appData/main todavía contiene perfil', rawPayload.perfil);
-      delete rawPayload.perfil;
-    }
+    const payload = getCurrentStatePayload();
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(activeUser.uid);
-    const userDoc = sanitizeForFirestore({
-      uid: activeUser.uid,
-      plan: state.plan === 'premium' ? 'premium' : 'free',
-      email: activeUser?.email || '',
-      nombre: getVisibleUserName(),
-      createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
-      updatedAt: state._lastModified || new Date().toISOString()
-    });
-    if(userDoc && userDoc.perfil){
-      console.warn('Se eliminó perfil de users/{uid} para evitar error Firestore');
-      delete userDoc.perfil;
-    }
     await Promise.all([
-      safeFirestoreSet(ref, rawPayload, {merge:true}, 'emergencia:appData/main'),
-      safeFirestoreSet(userRef, userDoc, {merge:true}, 'emergencia:users/{uid}')
+      ref.set({
+        state: payload,
+        meta: {
+          updatedAt: state._lastModified || new Date().toISOString(),
+          dataKeys: APP_DATA_KEYS
+        }
+      }, {merge:true}),
+      userRef.set({
+        plan: state.plan === 'premium' ? 'premium' : 'free',
+        email: activeUser?.email || '',
+        nombre: getVisibleUserName(),
+        perfil: buildSyncedProfilePayload(),
+        updatedAt: state._lastModified || new Date().toISOString()
+      }, {merge:true})
     ]);
-    console.log('Datos guardados en Firestore', rawPayload);
+    console.log('Datos guardados en Firestore', payload);
     setCloudStatus('synced');
     showToast(successMessage);
     return true;
@@ -4753,105 +4115,6 @@ function importarBackupEmergencia(event){
 }
 async function forzarSubirDatosActualesANube(){
   await subirEstadoActualANubeEstricto('Datos subidos a la nube correctamente');
-}
-async function testCloudSave(){
-  try{
-    state._cloudLastError = null;
-    const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
-    if(!authUid || authUid!==getActiveUserUid()){
-      state._cloudLastError = {
-        code: 'firestore/no-current-user',
-        message: 'No hay usuario activo para probar la nube',
-        stack: ''
-      };
-      showToast('firestore/no-current-user: No hay usuario activo para probar la nube');
-      render();
-      return false;
-    }
-    const ref = getFirestoreDocRef('main');
-    if(!ref){
-      state._cloudLastError = {
-        code: 'firestore/invalid-ref',
-        message: 'No se pudo obtener appData/main',
-        stack: ''
-      };
-      showToast('firestore/invalid-ref: No se pudo obtener appData/main');
-      render();
-      return false;
-    }
-    const payload = {
-      debugTest: true,
-      debugAt: new Date().toISOString(),
-      listasGlobales: sanitizeForFirestore(state.listasGlobales || [])
-    };
-    const invalidPaths = findInvalidFirestoreValues(payload);
-    const cleanPayload = sanitizeForFirestore(payload);
-    console.log('UID actual:', authUid);
-    console.log('Ruta appData/main:', `users/${authUid}/appData/main`);
-    console.log('Payload appData/main:', payload);
-    console.warn('Valores inválidos Firestore:', invalidPaths);
-    console.log('Payload limpio para Firestore:', cleanPayload);
-    await safeFirestoreSet(ref, payload, {merge:true}, 'testCloudSave');
-    const verifySnap = await ref.get();
-    if(verifySnap.exists){
-      showToast('Prueba guardada en appData/main');
-      return true;
-    }
-    state._cloudLastError = {
-      code: 'firestore/not-verified',
-      message: 'No se pudo verificar el guardado en la nube',
-      stack: ''
-    };
-    console.error('No se pudo verificar el guardado en la nube');
-    showToast('No se pudo verificar el guardado en la nube');
-    render();
-    return false;
-  }catch(error){
-    console.error('Error completo testCloudSave:', error);
-    console.error('Error real guardando appData/main:', error);
-    state._cloudLastError = {
-      code: error?.code || 'firestore/error',
-      message: error?.message || 'No se pudo guardar en la nube',
-      stack: error?.stack || '',
-      field: error?.fieldPath || error?.customData?.fieldPath || ''
-    };
-    showToast(`${error?.code || 'firestore/error'}: ${error?.message || 'No se pudo guardar en la nube'}`);
-    render();
-    return false;
-  }
-}
-async function testNoPerfilFirestoreSave(){
-  try{
-    clearLastCloudError();
-    const uid = String(firebaseAuth?.currentUser?.uid || '').trim();
-    if(!uid) throw {code:'firestore/no-current-user', message:'No hay usuario activo para probar la nube'};
-    const ref = firestoreDb.collection('users').doc(uid).collection('appData').doc('main');
-    const testPayload = {
-      debugTestNoPerfil: true,
-      debugAt: new Date().toISOString(),
-      perfil: { esto: 'debe eliminarse' },
-      nested: {
-        perfil: { tambien: 'debe eliminarse' }
-      },
-      listasGlobales: state.listasGlobales || []
-    };
-    await safeFirestoreSet(ref, testPayload, {merge:true}, 'test-no-perfil');
-    const verifySnap = await ref.get();
-    if(verifySnap.exists){
-      showToast('Prueba guardada sin perfil');
-      return true;
-    }
-    throw {code:'firestore/not-verified', message:'No se pudo verificar test-no-perfil'};
-  }catch(error){
-    console.error('Error testNoPerfilFirestoreSave:', error);
-    setLastCloudError({
-      code: error?.code || '',
-      message: error?.message || String(error),
-      stack: error?.stack || ''
-    });
-    render();
-    return false;
-  }
 }
 
 let toastTimer = null;
@@ -4936,32 +4199,26 @@ setInterval(()=>{
       resetScopedState();
       syncActiveUserFromFirebase(resolvedUser);
       if(resolvedUser){
-        startLoginProgress(state._loginStatus || 'Cargando tus datos...');
-        await ensureUserDocument(resolvedUser);
+        await ensureUserDirectoryDoc(resolvedUser);
         reloadScopedLocalState();
         authReady = true;
-        render();
         if(firestoreEnabled && (typeof navigator==='undefined' || navigator.onLine)){
           setCloudStatus('syncing');
           loadDataFromFirestore()
             .then(()=>{
-              finishLoginProgress();
               render();
               setCloudStatus('synced');
             })
             .catch(err=>{
               console.error('Initial Firestore load error', err);
-              failLoginProgress('No se pudieron cargar tus datos. Podés continuar con los disponibles.', err);
               setCloudStatus((typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local');
               render();
             });
           return;
         }
-        finishLoginProgress();
         render();
         return;
       }
-      finishLoginProgress();
       setCloudStatus('local');
       authReady = true;
       render();
