@@ -1456,7 +1456,9 @@ function parseAcapHorario(horario){
   const normalizedValue = value
     .replace(/^de\s+/i, '')
     .replace(/^desde\s+/i, 'Desde ')
-    .replace(/^hasta\s+/i, 'Hasta ');
+    .replace(/^hasta\s+/i, 'Hasta ')
+    .replace(/\s+/g, ' ')
+    .trim();
   const rangeMatch = normalizedValue.match(/(\d{1,2}(?::\d{2})?)\s*(?:a|-)\s*(\d{1,2}(?::\d{2})?)/i);
   if(rangeMatch){
     const horaDesde = rangeMatch[1];
@@ -1493,6 +1495,7 @@ function parseAcapHorario(horario){
 function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
   const acaps = state.acaps || {};
   const alumnosByDay = new Map();
+  const recordsToday = [];
   Object.entries(acaps).forEach(([key, data])=>{
     if(!data) return;
     const match = String(key).match(/^(.+?)_(.+?)_(\d{4}-\d{2}-\d{2})$/);
@@ -1504,28 +1507,50 @@ function getAcapNotificationSummary(fecha=todayISO(), currentDate=new Date()){
     const alumno = (state.alumnos?.[cursoId] || []).find(a=>a.id===alumnoId);
     if(!alumno) return;
     const dedupeKey = `${cursoId}_${alumnoId}`;
-    if(alumnosByDay.has(dedupeKey)) return;
-    alumnosByDay.set(dedupeKey, {
+    const item = {
+      key,
       cursoId,
       alumnoId,
+      fecha: recordDate,
       nombre: alumno.nombre,
       empresa: String(data?.empresa || data?.lugar || '').trim(),
-      horario: String(data?.horario || '').trim(),
+      horario: String(data?.horario || buildHorario(data?.horaDesde||'', data?.horaHasta||'') || '').trim(),
       data
-    });
+    };
+    recordsToday.push(item);
+    if(alumnosByDay.has(dedupeKey)) return;
+    alumnosByDay.set(dedupeKey, item);
   });
   const nowMinutes = currentDate.getHours() * 60 + currentDate.getMinutes();
-  const activeNow = [...alumnosByDay.values()].filter(item=>{
-    const parsed = parseAcapHorario(item.horario || buildHorario(item.data?.horaDesde||'', item.data?.horaHasta||''));
-    const active = !(parsed.start===null || parsed.end===null) && nowMinutes >= parsed.start && nowMinutes <= parsed.end;
-    console.log('ACAP horario:', item.horario || buildHorario(item.data?.horaDesde||'', item.data?.horaHasta||''), 'parseado:', parsed, 'ahora:', nowMinutes, 'activo:', active);
-    return active;
+  const activeNowMap = new Map();
+  recordsToday.forEach(item=>{
+    const parsed = parseAcapHorario(item.horario);
+    let active = false;
+    if(parsed.start !== null && parsed.end !== null){
+      active = nowMinutes >= parsed.start && nowMinutes <= parsed.end;
+    }else if(parsed.start !== null){
+      active = nowMinutes >= parsed.start;
+    }else if(parsed.end !== null){
+      active = nowMinutes <= parsed.end;
+    }
+    console.log('ACAP ahora registro:', {
+      key: item.key,
+      alumno: item.nombre,
+      fecha: item.fecha,
+      horario: item.horario,
+      parsed,
+      ahoraMinutos: nowMinutes,
+      activo
+    });
+    if(!active) return;
+    const dedupeKey = `${item.cursoId}_${item.alumnoId}`;
+    if(!activeNowMap.has(dedupeKey)) activeNowMap.set(dedupeKey, item);
   });
   return {
     totalHoy: alumnosByDay.size,
     alumnosHoy: [...alumnosByDay.values()],
-    totalAhora: activeNow.length,
-    alumnosAhora: activeNow
+    totalAhora: activeNowMap.size,
+    alumnosAhora: [...activeNowMap.values()]
   };
 }
 function getAcapEntriesForAlumno(cursoId, alumnoId, opts){
