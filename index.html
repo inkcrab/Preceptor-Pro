@@ -365,6 +365,60 @@ function setCloudStatus(status){
   if(typeof document!=='undefined' && document.getElementById('app')) render();
 }
 
+function setLastCloudError(input, fallbackMessage){
+  const error = input && typeof input === 'object' ? input : {};
+  state._lastCloudError = {
+    code: error.code || 'unknown',
+    message: error.message || fallbackMessage || String(input || 'Error de nube desconocido'),
+    stack: error.stack || '',
+    time: new Date().toISOString()
+  };
+}
+
+function setCloudCancelReason(code, message){
+  setLastCloudError({code, message, stack:''}, message);
+}
+
+function getCloudStatusLabel(){
+  const cloudStatusMap = {
+    syncing: {text:'Sincronizando...', bg:'#fff8e1', color:'#b26a00'},
+    synced: {text:'Guardado en la nube', bg:'#effaf3', color:'#1f7a3f'},
+    offline: {text:'Guardado local / sin conexión', bg:'#fff5f5', color:'#c0392b'},
+    local: {text:'Guardado local', bg:'#f3f4f6', color:'#666'},
+  };
+  const base = cloudStatusMap[state._cloudStatus||'local'] || cloudStatusMap.local;
+  if((state._cloudStatus==='local' || state._cloudStatus==='offline') && state._lastCloudError?.message){
+    return {
+      ...base,
+      text: `${base.text}: ${state._lastCloudError.message}`
+    };
+  }
+  return base;
+}
+
+async function copiarErrorNube(){
+  const cloudError = state._lastCloudError || null;
+  const text = cloudError
+    ? `Hora: ${cloudError.time || ''}\nCode: ${cloudError.code || ''}\nMessage: ${cloudError.message || ''}\nStack: ${cloudError.stack || ''}`
+    : 'No hay error de nube registrado todavía.';
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+    }else{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    showToast('Error de nube copiado');
+  }catch(err){
+    console.error('Copy cloud error failed', err);
+    showToast('No se pudo copiar el error');
+  }
+}
+
 const S = {
   get:(k,d)=>{
     try{
@@ -429,6 +483,7 @@ let state = {
   _authMode: 'login',
   _rememberLogin: getAuthPersistencePreference()!=='session',
   _cloudStatus: 'local',
+  _lastCloudError: null,
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
   _lastModified: S.get('pp_last_modified', ''),
@@ -813,12 +868,18 @@ async function loadDataFromFirestore(){
   }
 }
 function queueFirestoreSave(){
-  if(remoteHydrating) return;
+  if(remoteHydrating){
+    setCloudCancelReason('remote-hydrating', 'remote-hydrating');
+    setCloudStatus('local');
+    return;
+  }
   if(!activeUser?.uid || !firestoreEnabled){
+    setCloudCancelReason(!activeUser?.uid ? 'no-current-user' : 'firebase-disabled', !activeUser?.uid ? 'sin usuario autenticado' : 'Firebase no disponible');
     setCloudStatus('local');
     return;
   }
   if(typeof navigator!=='undefined' && !navigator.onLine){
+    setCloudCancelReason('offline', 'sin conexión');
     setCloudStatus('offline');
     return;
   }
@@ -849,6 +910,7 @@ async function saveToFirestore(){
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
       nextStatus = 'local';
+      setCloudCancelReason('no-current-user', 'sin usuario autenticado');
       console.warn('Skipping Firestore save: no authenticated uid available.');
       return;
     }
@@ -857,6 +919,12 @@ async function saveToFirestore(){
     const payload = getCurrentStatePayload();
     if(!ref){
       nextStatus = 'local';
+      setCloudCancelReason('firestore-unavailable', 'Firestore no disponible');
+      return;
+    }
+    if(!hasMeaningfulPersistedData(payload)){
+      nextStatus = 'local';
+      setCloudCancelReason('empty-payload', 'payload vacío');
       return;
     }
     await Promise.all([
@@ -878,8 +946,10 @@ async function saveToFirestore(){
       }, {merge:true}) : Promise.resolve()
     ]);
     console.log('Datos guardados en Firestore', payload);
+    if(state._cloudStatus!=='synced') setCloudStatus('synced');
   }catch(err){
     console.error('Firestore save error', err);
+    setLastCloudError(err, err?.message || 'Error guardando en Firestore');
     nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
   }finally{
     setCloudStatus(nextStatus);
@@ -1509,13 +1579,7 @@ function buildApp(){
   const showNav = state.screen!=='perfil' && state.screen!=='config' && state.screen!=='curso';
   const showFab = showNav && state.tab==='cursos';
 
-  const cloudStatusMap = {
-    syncing: {text:'Sincronizando...', bg:'#fff8e1', color:'#b26a00'},
-    synced: {text:'Guardado en la nube', bg:'#effaf3', color:'#1f7a3f'},
-    offline: {text:'Guardado local / sin conexión', bg:'#fff5f5', color:'#c0392b'},
-    local: {text:'Guardado local / sin conexión', bg:'#f3f4f6', color:'#666'},
-  };
-  const cloudUi = cloudStatusMap[state._cloudStatus||'local'];
+  const cloudUi = getCloudStatusLabel();
   return `
     <div>
       ${html}
@@ -2439,6 +2503,7 @@ function buildConfig(){
   const cols = state.colors;
   const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
   const adminLookup = state._adminLookupResult || null;
+  const cloudError = state._lastCloudError || null;
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -2519,6 +2584,7 @@ function buildConfig(){
     </div>
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">EMERGENCIA / RECUPERACIÓN</div>
+      <div style="font-size:12px;color:#c0392b;font-weight:800;margin-bottom:10px">Versión diagnóstico nube: sync-debug-01</div>
       <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Herramientas manuales para salvar los datos actuales del dispositivo y volver a subirlos a la nube sin tocar el funcionamiento normal.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button onclick="exportarBackupEmergencia()" class="btn-primary" style="flex:1;min-width:180px">Exportar backup JSON</button>
@@ -2526,6 +2592,19 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="forzarSubirDatosActualesANube()" class="btn-ghost" style="width:100%">Forzar subir datos actuales a la nube</button>
+      </div>
+      <div style="margin-top:14px;padding:12px;border-radius:12px;background:#f8f9fa;border:1px solid #e6e9ef">
+        <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">Último error nube</div>
+        ${cloudError ? `
+          <div style="font-size:12px;color:#555;line-height:1.5">
+            <div><strong>Hora:</strong> ${esc(cloudError.time || '')}</div>
+            <div><strong>Code:</strong> ${esc(cloudError.code || '')}</div>
+            <div><strong>Message:</strong> ${esc(cloudError.message || '')}</div>
+            <div style="margin-top:8px"><strong>Stack:</strong></div>
+            <div style="white-space:pre-wrap;word-break:break-word;color:#666">${esc(cloudError.stack || '')}</div>
+          </div>
+        ` : `<div style="font-size:12px;color:#777">No hay error de nube registrado todavía.</div>`}
+        <button onclick="copiarErrorNube()" class="btn-ghost" style="margin-top:12px;width:100%">Copiar error nube</button>
       </div>
     </div>
     <div class="card" style="margin-bottom:16px">
