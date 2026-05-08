@@ -355,7 +355,7 @@ function setCloudStatus(status){
   if(status === 'syncing'){
     cloudStatusTimer = setTimeout(()=>{
       if(state._cloudStatus === 'syncing'){
-        state._cloudStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
+        state._cloudStatus = 'local';
         if(typeof document!=='undefined' && document.getElementById('app')) render();
       }
     }, 8000);
@@ -377,6 +377,17 @@ function setLastCloudError(input, fallbackMessage){
 
 function setCloudCancelReason(code, message){
   setLastCloudError({code, message, stack:''}, message);
+}
+
+function isCloudConnectionError(error){
+  const code = String(error?.code || '').toLowerCase();
+  const message = String(error?.message || error || '').toLowerCase();
+  return [
+    'unavailable',
+    'network-request-failed',
+    'failed-precondition',
+    'deadline-exceeded'
+  ].includes(code) || /network|offline|internet|connection|unavailable|fetch/.test(message);
 }
 
 function getCloudStatusLabel(){
@@ -878,11 +889,8 @@ function queueFirestoreSave(){
     setCloudStatus('local');
     return;
   }
-  if(typeof navigator!=='undefined' && !navigator.onLine){
-    setCloudCancelReason('offline', 'sin conexión');
-    setCloudStatus('offline');
-    return;
-  }
+  console.log('navigator.onLine:', typeof navigator!=='undefined' ? navigator.onLine : 'unknown');
+  console.log('Intentando guardar en Firestore aunque online sea:', typeof navigator!=='undefined' ? navigator.onLine : 'unknown');
   clearTimeout(remoteSaveTimer);
   setCloudStatus('syncing');
   remoteSaveTimer = setTimeout(()=>{ saveToFirestore(); }, 500);
@@ -907,6 +915,8 @@ async function upsertRemoteUserPlan(uid, plan, extra={}){
 async function saveToFirestore(){
   let nextStatus = 'synced';
   try{
+    console.log('navigator.onLine:', typeof navigator!=='undefined' ? navigator.onLine : 'unknown');
+    console.log('Intentando guardar en Firestore aunque online sea:', typeof navigator!=='undefined' ? navigator.onLine : 'unknown');
     const authUid = String(firebaseAuth?.currentUser?.uid || '').trim();
     if(!authUid || authUid!==getActiveUserUid()){
       nextStatus = 'local';
@@ -950,7 +960,7 @@ async function saveToFirestore(){
   }catch(err){
     console.error('Firestore save error', err);
     setLastCloudError(err, err?.message || 'Error guardando en Firestore');
-    nextStatus = (typeof navigator!=='undefined' && !navigator.onLine) ? 'offline' : 'local';
+    nextStatus = isCloudConnectionError(err) ? 'offline' : 'local';
   }finally{
     setCloudStatus(nextStatus);
   }
