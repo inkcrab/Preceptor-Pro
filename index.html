@@ -152,6 +152,7 @@ const supportWhatsapp = '549XXXXXXXXXX';
 const premiumMessage = 'Hola! Quiero pasarme a Premium en Preceptor Pro.';
 const SUPPORT_WHATSAPP = supportWhatsapp;
 const adminEmails = ['omar_moyano@hotmail.com'];
+const APP_VERSION = 'sync-download-debug-01';
 const AUTH_USERS_KEY = 'pp_auth_users';
 const AUTH_ACTIVE_KEY = 'pp_auth_active';
 const AUTH_ACTIVE_SESSION_KEY = 'pp_auth_active_session';
@@ -495,6 +496,7 @@ let state = {
   _rememberLogin: getAuthPersistencePreference()!=='session',
   _cloudStatus: 'local',
   _lastCloudError: null,
+  _lastCloudRemoteUpdatedAt: '',
   _online: typeof navigator!=='undefined' ? navigator.onLine : true,
   _toast: null,
   _lastModified: S.get('pp_last_modified', ''),
@@ -558,6 +560,8 @@ function resetScopedState(options={}){
   state._authMode = authMode;
   state._rememberLogin = rememberLogin;
   state._cloudStatus = 'local';
+  state._lastCloudError = null;
+  state._lastCloudRemoteUpdatedAt = '';
   state._toast = null;
   state.modal = null;
   state.modalData = {};
@@ -646,11 +650,26 @@ function getAppDataPayload(){
 function hasMeaningfulPersistedData(data){
   if(!data || typeof data!=='object') return false;
   const source = data.state && typeof data.state==='object' ? data.state : data;
-  return Object.keys(PERSIST_DEFAULTS).some(k=>typeof source[k] !== 'undefined');
+  if(Array.isArray(source.cursos) && source.cursos.length>0) return true;
+  if(source.alumnos && typeof source.alumnos === 'object' && Object.keys(source.alumnos).length>0) return true;
+  if(source.asistencia && typeof source.asistencia === 'object' && Object.keys(source.asistencia).length>0) return true;
+  if(source.acaps && typeof source.acaps === 'object' && Object.keys(source.acaps).length>0) return true;
+  if(source.listas && typeof source.listas === 'object' && Object.keys(source.listas).length>0) return true;
+  if(Array.isArray(source.listasGlobales) && source.listasGlobales.length>0) return true;
+  if(Array.isArray(source.notas) && source.notas.length>0) return true;
+  if(Array.isArray(source.eventos) && source.eventos.length>0) return true;
+  if(Array.isArray(source.agenda) && source.agenda.length>0) return true;
+  if(source.horarios && typeof source.horarios === 'object' && Object.keys(source.horarios).length>0) return true;
+  if(source.colors && typeof source.colors === 'object' && Object.keys(source.colors).length>0) return true;
+  if(source.perfil && typeof source.perfil === 'object'){
+    if(String(source.perfil.nombre||'').trim() || String(source.perfil.escuela||'').trim() || String(source.perfil.institucion||'').trim() || String(source.perfil.turno||'').trim() || String(source.perfil.foto||'').trim()) return true;
+  }
+  return !!String(source.updatedAt || source._lastModified || '').trim();
 }
 function applyPersistedState(data){
   if(!data || typeof data!=='object') return;
   const source = data.state && typeof data.state==='object' ? data.state : data;
+  state._lastCloudRemoteUpdatedAt = String(source.updatedAt || source._lastModified || data?.meta?.updatedAt || state._lastCloudRemoteUpdatedAt || '').trim();
   ['cursos','alumnos','asistencia','acaps','listas','listasGlobales','notas','eventos','horarios','horasInstitucion','perfil','colors','config','userProfile','plan'].forEach(k=>{
     if(typeof source[k] === 'undefined'){
       console.warn(`Firestore missing field: ${k}`);
@@ -906,7 +925,21 @@ async function loadDataFromFirestore(){
       return planLoaded;
     }
     remoteHydrating = true;
-    if (hasMeaningfulLocalState()) {
+    const remoteSource = data.state && typeof data.state==='object' ? data.state : data;
+    const localHasCursoLists = !!(state.listas && typeof state.listas === 'object' && Object.keys(state.listas).length>0);
+    const localHasGlobalLists = Array.isArray(state.listasGlobales) && state.listasGlobales.length>0;
+    const remoteHasCursoLists = !!(remoteSource?.listas && typeof remoteSource.listas === 'object' && Object.keys(remoteSource.listas).length>0);
+    const remoteHasGlobalLists = Array.isArray(remoteSource?.listasGlobales) && remoteSource.listasGlobales.length>0;
+    const localHasLists = localHasCursoLists || localHasGlobalLists;
+    const remoteHasLists = remoteHasCursoLists || remoteHasGlobalLists;
+    const localStamp = String(state._lastModified || '').trim();
+    const remoteStamp = String(remoteSource?.updatedAt || remoteSource?._lastModified || data?.meta?.updatedAt || '').trim();
+    if(localHasLists && !remoteHasLists){
+      console.log('Conservando listas locales porque la nube no tiene listas todavía');
+      await saveToFirestore();
+      return true;
+    }
+    if (hasMeaningfulLocalState() && localStamp && remoteStamp && localStamp > remoteStamp) {
       console.log("Usando datos locales como fuente principal");
       await saveToFirestore();
       return true;
@@ -925,6 +958,49 @@ async function loadDataFromFirestore(){
   }finally{
     remoteHydrating = false;
   }
+}
+async function forzarDescargarDatosDesdeNube(){
+  const uid = String(firebaseAuth?.currentUser?.uid || '').trim();
+  if(!uid){
+    showToastSafe('No hay usuario conectado');
+    return;
+  }
+  if(!(firestoreEnabled && firestoreDb)){
+    const message = 'Firestore no está disponible.';
+    console.error(message);
+    showToastSafe(message);
+    return false;
+  }
+  try{
+    const user = firebaseAuth.currentUser;
+    const db = firestoreDb;
+    console.log('UID descargando nube:', uid);
+    const ref = db.collection('users').doc(user.uid).collection('appData').doc('main');
+    const snap = await ref.get();
+    if(!snap.exists){
+      showToastSafe('No hay datos guardados en la nube para esta cuenta');
+      return;
+    }
+    const data = snap.data() || {};
+    console.log('Datos descargados desde la nube:', data);
+    console.log('Datos descargados appData/main:', data);
+    console.log('Listas descargadas:', data.listas);
+    console.log('Listas globales descargadas:', data.listasGlobales);
+    applyPersistedState(data);
+    persistLocalState();
+    render();
+    showToastSafe('Datos descargados desde la nube');
+    return true;
+  }catch(err){
+    console.error('Error descargando datos desde la nube:', err);
+    setLastCloudError(err, err?.message || 'Error descargando desde la nube');
+    showToastSafe((err?.code || 'error') + ': ' + (err?.message || String(err)));
+    return false;
+  }
+}
+function showToastSafe(msg){
+  if(typeof showToast === 'function') showToast(msg);
+  else alert(msg);
 }
 function queueFirestoreSave(){
   if(remoteHydrating){
@@ -975,6 +1051,7 @@ async function saveToFirestore(){
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
     const payload = sanitizeForFirestore(getAppDataPayload());
+    console.log('Payload enviado a Firestore:', payload);
     if(!ref){
       nextStatus = 'local';
       setCloudCancelReason('firestore-unavailable', 'Firestore no disponible');
@@ -1044,6 +1121,9 @@ function hydrateFromFirestoreInBackground(){
 
 function save(){
   state._lastModified = new Date().toISOString();
+  console.log('SAVE ejecutado');
+  console.log('Guardando listas:', state.listas);
+  console.log('Guardando listasGlobales:', state.listasGlobales);
   persistLocalState();
   try{
     const today = todayISO();
@@ -2557,6 +2637,10 @@ function buildConfig(){
   const planLabel = isPremiumPlan() ? 'Premium' : 'Free';
   const adminLookup = state._adminLookupResult || null;
   const cloudError = state._lastCloudError || null;
+  const currentUid = String(firebaseAuth?.currentUser?.uid || activeUser?.uid || '').trim();
+  const currentEmail = String(firebaseAuth?.currentUser?.email || activeUser?.email || '').trim();
+  const localUpdatedAt = String(state._lastModified || '').trim();
+  const remoteUpdatedAt = String(state._lastCloudRemoteUpdatedAt || '').trim();
   const cursosHtml = state.cursos.map(c=>`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:10px;background:#f8f9fa;border-radius:10px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -2638,6 +2722,16 @@ function buildConfig(){
     <div class="card" style="margin-bottom:16px">
       <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:14px">EMERGENCIA / RECUPERACIÓN</div>
       <div style="font-size:12px;color:#c0392b;font-weight:800;margin-bottom:10px">Versión diagnóstico nube: sync-debug-01</div>
+      <div style="margin-bottom:12px;padding:12px;border-radius:12px;background:#f8f9fa;border:1px solid #e6e9ef">
+        <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">Cuenta actual</div>
+        <div style="font-size:12px;color:#555;line-height:1.6">
+          <div><strong>Email:</strong> ${esc(currentEmail || 'Sin email')}</div>
+          <div><strong>UID:</strong> ${esc(currentUid || 'Sin uid')}</div>
+          <div><strong>App version:</strong> ${esc(APP_VERSION)}</div>
+          <div><strong>Último updatedAt local:</strong> ${esc(localUpdatedAt || 'Sin datos locales')}</div>
+          <div><strong>Último updatedAt nube:</strong> ${esc(remoteUpdatedAt || 'Sin datos de nube')}</div>
+        </div>
+      </div>
       <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:12px">Herramientas manuales para salvar los datos actuales del dispositivo y volver a subirlos a la nube sin tocar el funcionamiento normal.</div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button onclick="exportarBackupEmergencia()" class="btn-primary" style="flex:1;min-width:180px">Exportar backup JSON</button>
@@ -2648,6 +2742,9 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="forzarSubirDatosActualesANube(true)" class="btn-ghost" style="width:100%">Probar guardado en nube</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="forzarDescargarDatosDesdeNube()" class="btn-ghost" style="width:100%">Forzar descargar datos desde la nube</button>
       </div>
       <div style="margin-top:14px;padding:12px;border-radius:12px;background:#f8f9fa;border:1px solid #e6e9ef">
         <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">Último error nube</div>
@@ -4616,7 +4713,7 @@ setInterval(()=>{
         await ensureUserDirectoryDoc(resolvedUser);
         reloadScopedLocalState();
         authReady = true;
-        if(firestoreEnabled && (typeof navigator==='undefined' || navigator.onLine)){
+        if(firestoreEnabled){
           setCloudStatus('syncing');
           loadDataFromFirestore()
             .then(()=>{
