@@ -595,6 +595,54 @@ function serializePersistedState(){
     _lastModified: state._lastModified,
   };
 }
+function isPlainObject(obj){
+  return Object.prototype.toString.call(obj) === '[object Object]';
+}
+function sanitizeForFirestore(value, seen=new WeakSet()){
+  if(typeof value === 'undefined' || typeof value === 'function' || typeof value === 'symbol') return undefined;
+  if(value === null) return null;
+  if(typeof value === 'string' || typeof value === 'boolean') return value;
+  if(typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if(value instanceof Date) return value.toISOString();
+  if(typeof Node!=='undefined' && value instanceof Node) return undefined;
+  if(typeof Event!=='undefined' && value instanceof Event) return undefined;
+  if(typeof File!=='undefined' && value instanceof File) return undefined;
+  if(typeof Blob!=='undefined' && value instanceof Blob) return undefined;
+  if(Array.isArray(value)){
+    return value
+      .map(item=>sanitizeForFirestore(item, seen))
+      .filter(item=>typeof item !== 'undefined');
+  }
+  if(!value || typeof value !== 'object') return undefined;
+  if(seen.has(value)) return undefined;
+  if(!isPlainObject(value)) return undefined;
+  seen.add(value);
+  const next = {};
+  Object.keys(value).forEach(key=>{
+    const clean = sanitizeForFirestore(value[key], seen);
+    if(typeof clean !== 'undefined') next[key] = clean;
+  });
+  seen.delete(value);
+  return next;
+}
+function getAppDataPayload(){
+  return sanitizeForFirestore({
+    cursos: state.cursos,
+    alumnos: state.alumnos,
+    asistencia: state.asistencia,
+    acaps: state.acaps,
+    listas: state.listas,
+    listasGlobales: state.listasGlobales,
+    perfil: buildSyncedProfilePayload(),
+    notas: state.notas,
+    agenda: state.eventos,
+    eventos: state.eventos,
+    horarios: state.horarios,
+    colors: state.colors,
+    plan: state.plan,
+    updatedAt: state._lastModified || new Date().toISOString()
+  });
+}
 function hasMeaningfulPersistedData(data){
   if(!data || typeof data!=='object') return false;
   const source = data.state && typeof data.state==='object' ? data.state : data;
@@ -651,7 +699,7 @@ function buildSyncedProfilePayload(){
   };
 }
 function getCurrentStatePayload(){
-  return serializePersistedState();
+  return getAppDataPayload();
 }
 function hasMeaningfulLocalState(){
   return hasMeaningfulPersistedData(getCurrentStatePayload());
@@ -926,7 +974,7 @@ async function saveToFirestore(){
     }
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(authUid);
-    const payload = getCurrentStatePayload();
+    const payload = sanitizeForFirestore(getAppDataPayload());
     if(!ref){
       nextStatus = 'local';
       setCloudCancelReason('firestore-unavailable', 'Firestore no disponible');
@@ -938,14 +986,8 @@ async function saveToFirestore(){
       return;
     }
     await Promise.all([
-      ref.set({
-        state: payload,
-        meta: {
-          updatedAt: state._lastModified || new Date().toISOString(),
-          dataKeys: APP_DATA_KEYS
-        }
-      }, {merge:true}),
-      userRef ? userRef.set({
+      ref.set(payload, {merge:true}),
+      userRef ? userRef.set(sanitizeForFirestore({
         uid: authUid,
         plan: state.plan === 'premium' ? 'premium' : 'free',
         email: String(activeUser?.email || '').trim().toLowerCase(),
@@ -953,13 +995,14 @@ async function saveToFirestore(){
         perfil: buildSyncedProfilePayload(),
         createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
         updatedAt: state._lastModified || new Date().toISOString()
-      }, {merge:true}) : Promise.resolve()
+      }), {merge:true}) : Promise.resolve()
     ]);
     console.log('Datos guardados en Firestore', payload);
     if(state._cloudStatus!=='synced') setCloudStatus('synced');
   }catch(err){
     console.error('Firestore save error', err);
     setLastCloudError(err, err?.message || 'Error guardando en Firestore');
+    showToast(`${err?.code || 'firestore/error'}: ${err?.message || 'Error guardando en Firestore'}`);
     nextStatus = isCloudConnectionError(err) ? 'offline' : 'local';
   }finally{
     setCloudStatus(nextStatus);
@@ -2602,6 +2645,9 @@ function buildConfig(){
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
         <button onclick="forzarSubirDatosActualesANube()" class="btn-ghost" style="width:100%">Forzar subir datos actuales a la nube</button>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+        <button onclick="forzarSubirDatosActualesANube(true)" class="btn-ghost" style="width:100%">Probar guardado en nube</button>
       </div>
       <div style="margin-top:14px;padding:12px;border-radius:12px;background:#f8f9fa;border:1px solid #e6e9ef">
         <div style="font-weight:700;font-size:13px;color:#888;margin-bottom:10px">Último error nube</div>
@@ -4407,33 +4453,34 @@ function seleccionarBackupEmergencia(){
   input.value = '';
   input.click();
 }
-async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la nube correctamente'){
+async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la nube correctamente', extraPayload=null){
   if(!(firestoreEnabled && firestoreDb && activeUser?.uid)){
     const code = 'firestore/not-available';
     const message = 'No hay una sesión con Firestore disponible para sincronizar.';
     console.error(code, message);
+    setLastCloudError({code, message, stack:''}, message);
+    setCloudStatus('local');
     showToast(`${code}: ${message}`);
     return false;
   }
   try{
-    const payload = getCurrentStatePayload();
+    const payload = sanitizeForFirestore({
+      ...getAppDataPayload(),
+      ...(extraPayload && typeof extraPayload === 'object' ? extraPayload : {})
+    });
     const ref = getFirestoreDocRef('main');
     const userRef = getUserDocRef(activeUser.uid);
     await Promise.all([
-      ref.set({
-        state: payload,
-        meta: {
-          updatedAt: state._lastModified || new Date().toISOString(),
-          dataKeys: APP_DATA_KEYS
-        }
-      }, {merge:true}),
-      userRef.set({
+      ref.set(payload, {merge:true}),
+      userRef.set(sanitizeForFirestore({
+        uid: activeUser.uid,
         plan: state.plan === 'premium' ? 'premium' : 'free',
         email: activeUser?.email || '',
         nombre: getVisibleUserName(),
         perfil: buildSyncedProfilePayload(),
+        createdAt: lastRemoteUserDoc?.createdAt || new Date().toISOString(),
         updatedAt: state._lastModified || new Date().toISOString()
-      }, {merge:true})
+      }), {merge:true})
     ]);
     console.log('Datos guardados en Firestore', payload);
     setCloudStatus('synced');
@@ -4443,6 +4490,8 @@ async function subirEstadoActualANubeEstricto(successMessage='Datos subidos a la
     console.error('Emergency Firestore sync error', err);
     const code = err?.code || 'firestore/error';
     const message = err?.message || 'Error desconocido al guardar en Firestore.';
+    setLastCloudError(err, message);
+    setCloudStatus(isCloudConnectionError(err) ? 'offline' : 'local');
     showToast(`${code}: ${message}`);
     return false;
   }
@@ -4472,7 +4521,13 @@ function importarBackupEmergencia(event){
   };
   reader.readAsText(file);
 }
-async function forzarSubirDatosActualesANube(){
+async function forzarSubirDatosActualesANube(testOnly=false){
+  if(testOnly){
+    await subirEstadoActualANubeEstricto('Prueba guardada en nube correctamente', {
+      testCloudSaveAt: new Date().toISOString()
+    });
+    return;
+  }
   await subirEstadoActualANubeEstricto('Datos subidos a la nube correctamente');
 }
 
