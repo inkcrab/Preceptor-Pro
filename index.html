@@ -909,12 +909,11 @@ async function loadDataFromFirestore(){
     const userSnap = userRef ? await userRef.get() : null;
     const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
     let data = null;
-    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
-    for(const ref of refs){
-      const snap = await ref.get();
+    const mainRef = getFirestoreDocRef('main');
+    if(mainRef){
+      const snap = await mainRef.get();
       if(snap.exists && hasMeaningfulPersistedData(snap.data())){
         data = snap.data();
-        break;
       }
     }
     const planLoaded = await loadUserPlanFromFirestore();
