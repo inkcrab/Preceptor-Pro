@@ -908,48 +908,31 @@ async function loadDataFromFirestore(){
     const userRef = getUserDocRef(authUid);
     const userSnap = userRef ? await userRef.get() : null;
     const userData = userSnap?.exists ? (userSnap.data() || {}) : null;
-    let data = null;
-    const mainRef = getFirestoreDocRef('main');
-    if(mainRef){
-      const snap = await mainRef.get();
-      if(snap.exists && hasMeaningfulPersistedData(snap.data())){
-        data = snap.data();
-      }
-    }
     const planLoaded = await loadUserPlanFromFirestore();
-    if(!data){
-      if(hasMeaningfulLocalState()){
-        await saveToFirestore();
-      }
+
+    const candidates = [];
+    if(hasMeaningfulLocalState()) candidates.push(getAppDataPayload());
+    const refs = [getFirestoreDocRef('main'), getFirestoreDocRef('legacy')].filter(Boolean);
+    for(const ref of refs){
+      const snap = await ref.get();
+      if(snap.exists && hasMeaningfulPersistedData(snap.data())) candidates.push(snap.data());
+    }
+    if(userData && hasMeaningfulPersistedData(userData)) candidates.push(userData);
+
+    if(!candidates.length){
       return planLoaded;
     }
+
+    const mergedState = buildMergedAppStateFromSources(...candidates);
     remoteHydrating = true;
-    const remoteSource = data.state && typeof data.state==='object' ? data.state : data;
-    const localHasCursoLists = !!(state.listas && typeof state.listas === 'object' && Object.keys(state.listas).length>0);
-    const localHasGlobalLists = Array.isArray(state.listasGlobales) && state.listasGlobales.length>0;
-    const remoteHasCursoLists = !!(remoteSource?.listas && typeof remoteSource.listas === 'object' && Object.keys(remoteSource.listas).length>0);
-    const remoteHasGlobalLists = Array.isArray(remoteSource?.listasGlobales) && remoteSource.listasGlobales.length>0;
-    const localHasLists = localHasCursoLists || localHasGlobalLists;
-    const remoteHasLists = remoteHasCursoLists || remoteHasGlobalLists;
-    const localStamp = String(state._lastModified || '').trim();
-    const remoteStamp = String(remoteSource?.updatedAt || remoteSource?._lastModified || data?.meta?.updatedAt || '').trim();
-    if(localHasLists && !remoteHasLists){
-      console.log('Conservando listas locales porque la nube no tiene listas todavía');
-      await saveToFirestore();
-      return true;
-    }
-    if (hasMeaningfulLocalState() && localStamp && remoteStamp && localStamp > remoteStamp) {
-      console.log("Usando datos locales como fuente principal");
-      await saveToFirestore();
-      return true;
-    }
-    applyPersistedState(data);
+    applyPersistedState({state: mergedState});
     if(lastRemoteUserDoc) applyRemoteProfileFromUserDoc(lastRemoteUserDoc);
     if(isAdminUser()) state.plan = 'premium';
     else if(planLoaded) state.plan = state.plan === 'premium' ? 'premium' : 'free';
-    console.log('Datos cargados desde Firestore', data.state && typeof data.state==='object' ? data.state : data);
-    remoteHydrating = false;
     persistLocalState();
+    remoteHydrating = false;
+    await saveToFirestore();
+    console.log('Datos recuperados/mezclados desde local + Firestore', mergedState);
     return true;
   }catch(err){
     console.error('Firestore load error', err);
